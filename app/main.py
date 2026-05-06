@@ -16,7 +16,14 @@ st.set_page_config(
 )
 
 # =========================================================
-# LIGHT UI CSS
+# SESSION STATE
+# =========================================================
+
+if "selected_element" not in st.session_state:
+    st.session_state.selected_element = None
+
+# =========================================================
+# CSS
 # =========================================================
 
 st.markdown(
@@ -44,11 +51,6 @@ st.markdown(
         font-weight: 600;
     }
 
-    p, div, span, label {
-        color: #1D1D1F;
-        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
     section[data-testid="stSidebar"] {
         background-color: #FFFFFF;
         border-right: 1px solid #E2E5EA;
@@ -61,11 +63,29 @@ st.markdown(
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
     }
 
-    .metric-box {
+    .inspector-box {
         background-color: #FFFFFF;
-        border-radius: 20px;
-        padding: 12px;
-        box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
+        border-radius: 22px;
+        padding: 20px;
+        box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
+    }
+
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #1D1D1F !important;
+    }
+
+    div[data-baseweb="popover"] {
+        background-color: #FFFFFF !important;
+    }
+
+    div[role="listbox"] {
+        background-color: #FFFFFF !important;
+    }
+
+    div[role="option"] {
+        background-color: #FFFFFF !important;
+        color: #1D1D1F !important;
     }
 
     </style>
@@ -109,7 +129,7 @@ show_cross_pathway = st.sidebar.toggle(
 )
 
 # =========================================================
-# LOAD FILES
+# FILES
 # =========================================================
 
 if network_type == "Upstream":
@@ -135,15 +155,11 @@ if selected_file:
     else:
         file_path = DOWNSTREAM_DIR / selected_file
 
-    # =====================================================
-    # READ EXCEL
-    # =====================================================
-
     sheet1 = pd.read_excel(file_path, sheet_name=0)
     sheet2 = pd.read_excel(file_path, sheet_name=1)
 
     # =====================================================
-    # BUILD GRAPH
+    # GRAPH
     # =====================================================
 
     G = nx.DiGraph()
@@ -194,226 +210,269 @@ if selected_file:
             )
 
     # =====================================================
-    # STATS
+    # LAYOUT
     # =====================================================
 
-    node_count = len(G.nodes())
-    edge_count = len(G.edges())
-
-    pathways = (
-        sheet1["Pathway_Name"]
-        .dropna()
-        .unique()
-    )
+    graph_col, inspector_col = st.columns([5, 1.7])
 
     # =====================================================
-    # METRICS
+    # GRAPH PANEL
     # =====================================================
 
-    m1, m2, m3, m4 = st.columns(4)
+    with graph_col:
 
-    with m1:
-        st.metric("Nodes", node_count)
+        st.markdown(
+            '<div class="network-box">',
+            unsafe_allow_html=True
+        )
 
-    with m2:
-        st.metric("Edges", edge_count)
+        nodes = []
+        edges = []
 
-    with m3:
-        st.metric("Pathways", len(pathways))
+        # =================================================
+        # NODES
+        # =================================================
 
-    with m4:
-        st.metric("Cross Links", len(sheet2))
+        for node in G.nodes():
 
-    st.write("")
+            degree = G.degree(node)
 
-    # =====================================================
-    # MAIN GRAPH PANEL
-    # =====================================================
+            node_type = G.nodes[node]["node_type"]
 
-    st.markdown(
-        '<div class="network-box">',
-        unsafe_allow_html=True
-    )
+            if node_type == "main_chain":
 
-    st.subheader("Biological Pathway Workspace")
+                color = "#4F8EF7"
+                size = 22 + (degree * 1.2)
+                shape = "ellipse"
 
-    # =====================================================
-    # CYTOSCAPE ELEMENTS
-    # =====================================================
+            else:
 
-    nodes = []
-    edges = []
+                color = "#D6E6FF"
+                size = 14 + (degree * 0.4)
+                shape = "round-rectangle"
 
-    # NODES
-    for node in G.nodes():
+            nodes.append({
+                "data": {
+                    "id": node,
+                    "label": node,
+                    "color": color,
+                    "size": size,
+                    "shape": shape,
+                    "degree": degree,
+                    "type": node_type
+                }
+            })
 
-        node_data = G.nodes[node]
+        # =================================================
+        # EDGES
+        # =================================================
 
-        degree = G.degree(node)
+        for source, target, data in G.edges(data=True):
 
-        if node_data["node_type"] == "main_chain":
+            if data["edge_type"] == "main_chain":
 
-            color = "#4F8EF7"
-            size = 22 + (degree * 1.2)
-            shape = "ellipse"
+                edge_color = "#4F8EF7"
+                width = 2.5
 
-        else:
+            else:
 
-            color = "#D6E6FF"
-            size = 14 + (degree * 0.4)
-            shape = "round-rectangle"
+                edge_color = "#C8DBFF"
+                width = 1
 
-        nodes.append({
-            "data": {
-                "id": node,
-                "label": node,
-                "color": color,
-                "size": size,
-                "shape": shape,
-                "degree": degree
-            }
-        })
+            edges.append({
+                "data": {
+                    "id": data["relation_id"],
+                    "source": source,
+                    "target": target,
+                    "label": data["relation_id"],
+                    "color": edge_color,
+                    "width": width,
+                    "interaction": data["interaction"],
+                    "edge_type": data["edge_type"]
+                }
+            })
 
-    # EDGES
-    for source, target, data in G.edges(data=True):
+        elements = nodes + edges
 
-        if data["edge_type"] == "main_chain":
+        # =================================================
+        # HTML
+        # =================================================
 
-            edge_color = "#4F8EF7"
-            width = 2.5
+        html_code = f"""
+        <!DOCTYPE html>
+        <html>
 
-        else:
+        <head>
 
-            edge_color = "#C8DBFF"
-            width = 1
+        <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
 
-        edges.append({
-            "data": {
-                "source": source,
-                "target": target,
-                "label": data["relation_id"],
-                "color": edge_color,
-                "width": width
-            }
-        })
+        <style>
 
-    cytoscape_data = {
-        "nodes": nodes,
-        "edges": edges
-    }
-
-    # =====================================================
-    # CYTOSCAPE HTML
-    # =====================================================
-
-    html_code = f"""
-    <!DOCTYPE html>
-    <html>
-
-    <head>
-
-    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
-
-    <style>
-
-    body {{
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background: #F8F9FB;
-    }}
-
-    #cy {{
-        width: 100%;
-        height: 950px;
-        background: #F8F9FB;
-        border-radius: 18px;
-    }}
-
-    </style>
-
-    </head>
-
-    <body>
-
-    <div id="cy"></div>
-
-    <script>
-
-    const elements = {json.dumps(cytoscape_data["nodes"] + cytoscape_data["edges"])};
-
-    const cy = cytoscape({{
-
-        container: document.getElementById('cy'),
-
-        elements: elements,
-
-        style: [
-
-            {{
-                selector: 'node',
-                style: {{
-                    'background-color': 'data(color)',
-                    'label': 'data(label)',
-                    'width': 'data(size)',
-                    'height': 'data(size)',
-                    'shape': 'data(shape)',
-                    'font-size': '10px',
-                    'text-valign': 'center',
-                    'text-halign': 'center',
-                    'color': '#1D1D1F',
-                    'border-width': 2,
-                    'border-color': '#FFFFFF',
-                    'overlay-opacity': 0
-                }}
-            }},
-
-            {{
-                selector: 'edge',
-                style: {{
-                    'width': 'data(width)',
-                    'line-color': 'data(color)',
-                    'target-arrow-color': 'data(color)',
-                    'target-arrow-shape': 'triangle',
-                    'curve-style': 'bezier',
-                    'opacity': 0.7
-                }}
-            }}
-
-        ],
-
-        layout: {{
-            name: 'cose',
-            animate: true,
-            fit: true,
-            padding: 60,
-            nodeRepulsion: 900000,
-            idealEdgeLength: 120,
-            edgeElasticity: 100,
-            gravity: 0.25
+        body {{
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #F8F9FB;
         }}
 
-    }});
+        #cy {{
+            width: 100%;
+            height: 900px;
+            background: #F8F9FB;
+        }}
 
-    </script>
+        </style>
 
-    </body>
+        </head>
 
-    </html>
-    """
+        <body>
 
-    html(
-        html_code,
-        height=980
-    )
+        <div id="cy"></div>
 
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
-    )
+        <script>
+
+        const cy = cytoscape({{
+
+            container: document.getElementById('cy'),
+
+            elements: {json.dumps(elements)},
+
+            style: [
+
+                {{
+                    selector: 'node',
+                    style: {{
+                        'background-color': 'data(color)',
+                        'label': 'data(label)',
+                        'width': 'data(size)',
+                        'height': 'data(size)',
+                        'shape': 'data(shape)',
+                        'font-size': '10px',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'color': '#1D1D1F',
+                        'border-width': 2,
+                        'border-color': '#FFFFFF'
+                    }}
+                }},
+
+                {{
+                    selector: 'edge',
+                    style: {{
+                        'width': 'data(width)',
+                        'line-color': 'data(color)',
+                        'target-arrow-color': 'data(color)',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'opacity': 0.7
+                    }}
+                }}
+
+            ],
+
+            layout: {{
+                name: 'cose',
+                animate: true,
+                fit: true,
+                padding: 60,
+                nodeRepulsion: 900000,
+                idealEdgeLength: 120,
+                edgeElasticity: 100,
+                gravity: 0.25
+            }}
+
+        }});
+
+        // =============================================
+        // NODE CLICK
+        // =============================================
+
+        cy.on('tap', 'node', function(evt) {{
+
+            const node = evt.target;
+
+            const data = node.data();
+
+            window.parent.postMessage({{
+                type: 'node_click',
+                payload: data
+            }}, '*');
+
+        }});
+
+        // =============================================
+        // EDGE CLICK
+        // =============================================
+
+        cy.on('tap', 'edge', function(evt) {{
+
+            const edge = evt.target;
+
+            const data = edge.data();
+
+            window.parent.postMessage({{
+                type: 'edge_click',
+                payload: data
+            }}, '*');
+
+        }});
+
+        </script>
+
+        </body>
+        </html>
+        """
+
+        html(
+            html_code,
+            height=920
+        )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
 
     # =====================================================
-    # TABLE SECTION
+    # INSPECTOR PANEL
+    # =====================================================
+
+    with inspector_col:
+
+        st.markdown(
+            '<div class="inspector-box">',
+            unsafe_allow_html=True
+        )
+
+        st.subheader("Inspector")
+
+        st.info(
+            "Click a node or edge in the network to inspect metadata."
+        )
+
+        st.write("### Network Statistics")
+
+        st.metric("Nodes", len(G.nodes()))
+        st.metric("Edges", len(G.edges()))
+
+        st.write("### Pathways")
+
+        pathways = (
+            sheet1["Pathway_Name"]
+            .dropna()
+            .unique()
+        )
+
+        for pathway in pathways[:10]:
+            st.write(f"• {pathway}")
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
+
+    # =====================================================
+    # TABLES
     # =====================================================
 
     with st.expander("Main Chain Relations Table"):
