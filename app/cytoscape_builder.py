@@ -85,20 +85,7 @@ def build_elements(
                     "label": source
                 },
 
-                "style": {
-
-                    "background-color": color,
-
-                    "label": source,
-
-                    "color": "white",
-
-                    "font-size": "12px",
-
-                    "border-width": 2,
-
-                    "border-color": "#FFFFFF"
-                }
+                "classes": "main"
             })
 
             added_nodes.add(source)
@@ -133,20 +120,7 @@ def build_elements(
                     "label": target
                 },
 
-                "style": {
-
-                    "background-color": color,
-
-                    "label": target,
-
-                    "color": "white",
-
-                    "font-size": "12px",
-
-                    "border-width": 2,
-
-                    "border-color": "#FFFFFF"
-                }
+                "classes": "main"
             })
 
             added_nodes.add(target)
@@ -164,23 +138,6 @@ def build_elements(
                 "target": target,
 
                 "label": interaction
-            },
-
-            "style": {
-
-                "line-color": get_edge_color(
-                    interaction
-                ),
-
-                "target-arrow-color": get_edge_color(
-                    interaction
-                ),
-
-                "target-arrow-shape": "triangle",
-
-                "curve-style": "bezier",
-
-                "width": 4
             }
         })
 
@@ -215,22 +172,7 @@ def build_elements(
                         "label": connected_node
                     },
 
-                    "style": {
-
-                        "background-color": "#8C7AE6",
-
-                        "label": connected_node,
-
-                        "color": "white",
-
-                        "font-size": "10px",
-
-                        "opacity": 0.5,
-
-                        "width": 20,
-
-                        "height": 20
-                    }
+                    "classes": "cross"
                 })
 
                 added_nodes.add(
@@ -252,23 +194,104 @@ def build_elements(
                     "label": "Cross Pathway"
                 },
 
-                "style": {
-
-                    "line-color": "#777777",
-
-                    "target-arrow-color": "#777777",
-
-                    "target-arrow-shape": "triangle",
-
-                    "line-style": "dashed",
-
-                    "opacity": 0.5,
-
-                    "width": 1
-                }
+                "classes": "cross_edge"
             })
 
     return elements
+
+
+# =========================================
+# STYLESHEET
+# =========================================
+
+def get_stylesheet():
+
+    return [
+
+        # =================================
+        # DEFAULT NODES
+        # =================================
+
+        {
+            "selector": "node",
+
+            "style": {
+
+                "label": "data(label)",
+
+                "color": "white",
+
+                "font-size": "12px",
+
+                "background-color": "#4DA6FF",
+
+                "border-width": 2,
+
+                "border-color": "#FFFFFF",
+
+                "width": 35,
+
+                "height": 35
+            }
+        },
+
+        # =================================
+        # CROSS NODES
+        # =================================
+
+        {
+            "selector": ".cross",
+
+            "style": {
+
+                "background-color": "#8C7AE6",
+
+                "opacity": 0.5,
+
+                "width": 20,
+
+                "height": 20
+            }
+        },
+
+        # =================================
+        # EDGES
+        # =================================
+
+        {
+            "selector": "edge",
+
+            "style": {
+
+                "curve-style": "bezier",
+
+                "target-arrow-shape": "triangle",
+
+                "line-color": "#999999",
+
+                "target-arrow-color": "#999999",
+
+                "width": 3
+            }
+        },
+
+        # =================================
+        # CROSS EDGES
+        # =================================
+
+        {
+            "selector": ".cross_edge",
+
+            "style": {
+
+                "line-style": "dashed",
+
+                "opacity": 0.5,
+
+                "width": 1
+            }
+        }
+    ]
 
 
 # =========================================
@@ -293,19 +316,10 @@ def render_cytoscape(
 
         elements=elements,
 
+        stylesheet=get_stylesheet(),
+
         layout={
             "name": "cose"
-        },
-
-        stylesheet=[],
-
-        style={
-
-            "width": "100%",
-
-            "height": "950px",
-
-            "background-color": "#0B0F1A"
         },
 
         key="bcl2_network"
