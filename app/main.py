@@ -31,6 +31,23 @@ st.set_page_config(
 
 
 # =========================================
+# SESSION STATE
+# =========================================
+
+if "selected_element" not in st.session_state:
+
+    st.session_state[
+        "selected_element"
+    ] = {}
+
+if "selected_node" not in st.session_state:
+
+    st.session_state[
+        "selected_node"
+    ] = None
+
+
+# =========================================
 # HEADER
 # =========================================
 
@@ -125,17 +142,33 @@ try:
     )
 
     # =====================================
-    # NODE SELECTOR
+    # NODE LIST
     # =====================================
 
     all_nodes = sorted(
         metadata.keys()
     )
 
-    selected_node = st.sidebar.selectbox(
+    # =====================================
+    # SIDEBAR NODE SELECTOR
+    # =====================================
+
+    sidebar_selected_node = st.sidebar.selectbox(
         "Select Node ID",
         all_nodes
     )
+
+    # =====================================
+    # INITIAL NODE
+    # =====================================
+
+    if st.session_state[
+        "selected_node"
+    ] is None:
+
+        st.session_state[
+            "selected_node"
+        ] = sidebar_selected_node
 
     # =====================================
     # MAIN LAYOUT
@@ -156,56 +189,70 @@ try:
         )
 
         selected_element = render_cytoscape(
-    df_main,
-    df_cross,
-    metadata,
-    include_cross_nodes
-)
+            df_main,
+            df_cross,
+            metadata,
+            include_cross_nodes
+        )
 
-# =====================================
-# STORE SELECTION
-# =====================================
+        # =================================
+        # STORE CYTOSCAPE SELECTION
+        # =================================
 
-if selected_element:
+        if selected_element:
 
-    st.session_state[
-        "selected_element"
-    ] = selected_element
+            st.session_state[
+                "selected_element"
+            ] = selected_element
 
-# =====================================
-# LOAD SELECTION
-# =====================================
+        # =================================
+        # LOAD CURRENT SELECTION
+        # =================================
 
-selected_element = st.session_state.get(
-    "selected_element",
-    {}
-)
-
-st.write(
-    "Selected Element:",
-    selected_element
-)
-
-# =====================================
-# AUTO NODE SELECTION
-# =====================================
-
-try:
-
-    selected_nodes = selected_element.get(
-        "nodes",
-        []
-    )
-
-    if selected_nodes:
-
-        selected_node = selected_nodes[0].get(
-            "data",
+        selected_element = st.session_state.get(
+            "selected_element",
             {}
-        ).get("id", selected_node)
+        )
 
-except:
-    pass
+        # =================================
+        # AUTO NODE UPDATE
+        # =================================
+
+        try:
+
+            selected_nodes = selected_element.get(
+                "nodes",
+                []
+            )
+
+            if selected_nodes:
+
+                clicked_node = selected_nodes[0].get(
+                    "data",
+                    {}
+                ).get("id")
+
+                if clicked_node:
+
+                    st.session_state[
+                        "selected_node"
+                    ] = clicked_node
+
+        except:
+            pass
+
+        # =================================
+        # DEBUG PANEL
+        # =================================
+
+        with st.expander(
+            "Selection Debug"
+        ):
+
+            st.write(
+                selected_element
+            )
+
     # =====================================
     # RIGHT PANEL
     # =====================================
@@ -214,6 +261,11 @@ except:
 
         st.subheader(
             "Biological Annotation Explorer"
+        )
+
+        selected_node = st.session_state.get(
+            "selected_node",
+            sidebar_selected_node
         )
 
         node_info = metadata.get(
@@ -346,6 +398,8 @@ except:
         # RELATION EXPLORER
         # =================================
 
+        st.markdown("---")
+
         render_relation_explorer(
             selected_node,
             df_main,
@@ -355,6 +409,8 @@ except:
         # =================================
         # LEGEND
         # =================================
+
+        st.markdown("---")
 
         render_legend()
 
