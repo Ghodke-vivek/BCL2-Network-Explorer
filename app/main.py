@@ -58,23 +58,6 @@ st.markdown(
         display: none;
     }
 
-    .network-box {
-        background-color: #FFFFFF;
-        border-radius: 24px;
-        padding: 18px;
-        box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
-        min-height: 900px;
-    }
-
-    .inspector-box {
-        background-color: #FFFFFF;
-        border-radius: 24px;
-        padding: 18px;
-        box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
-        min-height: 900px;
-        overflow-y: auto;
-    }
-
     .stSelectbox div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         color: #1D1D1F !important;
@@ -155,7 +138,7 @@ for _, row in metadata_df.iterrows():
     }
 
 # =========================================================
-# FILE LOADING
+# NETWORK TYPE
 # =========================================================
 
 network_type_default = "Upstream"
@@ -173,7 +156,7 @@ else:
 file_names = [f.name for f in files]
 
 # =========================================================
-# LAYOUT
+# MAIN LAYOUT
 # =========================================================
 
 left_col, center_col, right_col = st.columns(
@@ -185,11 +168,6 @@ left_col, center_col, right_col = st.columns(
 # =========================================================
 
 with left_col:
-
-    st.markdown(
-        '<div class="inspector-box">',
-        unsafe_allow_html=True
-    )
 
     st.subheader("Network Controls")
 
@@ -212,11 +190,6 @@ with left_col:
         " ",
         file_names,
         key="pathway_selector"
-    )
-
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
     )
 
 # =========================================================
@@ -386,7 +359,7 @@ for source, target, data in G.edges(data=True):
 
 config = Config(
     width="100%",
-    height=700,
+    height=850,
     directed=True,
     physics=True,
     hierarchical=False,
@@ -401,11 +374,6 @@ config = Config(
 
 with center_col:
 
-    st.markdown(
-        '<div class="network-box">',
-        unsafe_allow_html=True
-    )
-
     st.subheader("Biological Pathway Workspace")
 
     selected_node = agraph(
@@ -414,27 +382,13 @@ with center_col:
         config=config
     )
 
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
-    )
-
 # =========================================================
 # RIGHT PANEL
 # =========================================================
 
 with right_col:
 
-    st.markdown(
-        '<div class="inspector-box">',
-        unsafe_allow_html=True
-    )
-
     st.subheader("Pathway Inspector")
-
-    # =====================================================
-    # NETWORK SUMMARY
-    # =====================================================
 
     st.markdown("### Network Summary")
 
@@ -601,11 +555,6 @@ with right_col:
             st.info(
                 "Edge metadata unavailable."
             )
-
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
-    )
 
 # =========================================================
 # TABLES
