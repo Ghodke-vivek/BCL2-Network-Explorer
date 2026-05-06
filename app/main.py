@@ -17,12 +17,11 @@ from streamlit_agraph import (
 
 st.set_page_config(
     page_title="BCL2 Network Explorer",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 # =========================================================
-# LIGHT UI
+# CSS
 # =========================================================
 
 st.markdown(
@@ -39,8 +38,8 @@ st.markdown(
 
     .block-container {
         padding-top: 1rem;
-        padding-left: 1.5rem;
-        padding-right: 1.5rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
         max-width: 100%;
     }
 
@@ -56,32 +55,36 @@ st.markdown(
     }
 
     section[data-testid="stSidebar"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid #E2E5EA;
+        display: none;
     }
 
     .network-box {
         background-color: #FFFFFF;
         border-radius: 24px;
-        padding: 20px;
+        padding: 18px;
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
+        min-height: 900px;
     }
 
     .inspector-box {
         background-color: #FFFFFF;
         border-radius: 24px;
-        padding: 20px;
+        padding: 18px;
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
         min-height: 900px;
+        overflow-y: auto;
     }
 
-    div[data-baseweb="select"] > div {
+    .stSelectbox div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         color: #1D1D1F !important;
+        border-radius: 14px !important;
     }
 
-    div[data-baseweb="popover"] {
+    .stMultiSelect div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
+        color: #1D1D1F !important;
+        border-radius: 14px !important;
     }
 
     div[role="listbox"] {
@@ -91,6 +94,15 @@ st.markdown(
     div[role="option"] {
         background-color: #FFFFFF !important;
         color: #1D1D1F !important;
+    }
+
+    div[role="option"]:hover {
+        background-color: #E9EEF9 !important;
+    }
+
+    .stCodeBlock {
+        border-radius: 16px;
+        overflow: hidden;
     }
 
     </style>
@@ -111,7 +123,7 @@ st.markdown(
 )
 
 # =========================================================
-# PATHS
+# DATA PATHS
 # =========================================================
 
 UPSTREAM_DIR = Path("data/upstream")
@@ -131,27 +143,27 @@ metadata_lookup = {}
 
 for _, row in metadata_df.iterrows():
 
-    metadata_lookup[str(row["KEGG_ID"])] = row.to_dict()
+    metadata_lookup[str(row["KEGG_ID"])] = {
+        "Names": row.get("Names", ""),
+        "HSA Symbols": row.get("HSA_Symbols", ""),
+        "HSA Biological Names": row.get(
+            "HSA_Biological_Names", ""
+        ),
+        "UniProt IDs": row.get("UniProt_IDs", ""),
+        "GO IDs": row.get("GO_IDs", ""),
+        "GO Labels": row.get("GO_Labels", "")
+    }
 
 # =========================================================
-# SIDEBAR
+# FILE LOADING
 # =========================================================
 
-st.sidebar.title("Network Controls")
+network_type_default = "Upstream"
 
-network_type = st.sidebar.radio(
-    "Network Direction",
-    ["Upstream", "Downstream"]
+network_type = st.session_state.get(
+    "network_direction_main",
+    network_type_default
 )
-
-show_cross_pathway = st.sidebar.toggle(
-    "Show Cross Pathway Nodes",
-    value=True
-)
-
-# =========================================================
-# FILES
-# =========================================================
 
 if network_type == "Upstream":
     files = sorted(UPSTREAM_DIR.glob("*.xlsx"))
@@ -160,452 +172,457 @@ else:
 
 file_names = [f.name for f in files]
 
-selected_file = st.sidebar.selectbox(
-    "Select Pathway",
-    file_names
+# =========================================================
+# LAYOUT
+# =========================================================
+
+left_col, center_col, right_col = st.columns(
+    [1.1, 3.8, 1.5]
 )
 
 # =========================================================
-# LOAD NETWORK
+# LEFT PANEL
 # =========================================================
 
-if selected_file:
+with left_col:
 
-    if network_type == "Upstream":
-        file_path = UPSTREAM_DIR / selected_file
-    else:
-        file_path = DOWNSTREAM_DIR / selected_file
+    st.markdown(
+        '<div class="inspector-box">',
+        unsafe_allow_html=True
+    )
 
-    sheet1 = pd.read_excel(file_path, sheet_name=0)
-    sheet2 = pd.read_excel(file_path, sheet_name=1)
+    st.subheader("Network Controls")
 
-    # =====================================================
-    # GRAPH
-    # =====================================================
+    st.markdown("### Network Direction")
 
-    G = nx.DiGraph()
+    network_type = st.radio(
+        " ",
+        ["Upstream", "Downstream"],
+        key="network_direction_main"
+    )
 
-    node_metadata = {}
-    edge_metadata = {}
+    show_cross_pathway = st.toggle(
+        "Show Cross Pathway Nodes",
+        value=True
+    )
 
-    # =====================================================
-    # MAIN CHAIN
-    # =====================================================
+    st.markdown("### Select Pathway")
 
-    for _, row in sheet1.iterrows():
+    selected_file = st.selectbox(
+        " ",
+        file_names,
+        key="pathway_selector"
+    )
 
-        source = str(row["Source_NodeID"])
-        target = str(row["Target_NodeID"])
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True
+    )
 
-        interaction = str(row["Interaction"])
+# =========================================================
+# LOAD FILE
+# =========================================================
 
-        base_relation_id = str(row["RelationID"])
+if network_type == "Upstream":
+    file_path = UPSTREAM_DIR / selected_file
+else:
+    file_path = DOWNSTREAM_DIR / selected_file
 
-        relation_id = (
-            base_relation_id
-            + " | "
-            + source
-            + " → "
-            + target
-        )
+sheet1 = pd.read_excel(file_path, sheet_name=0)
+sheet2 = pd.read_excel(file_path, sheet_name=1)
 
-        source_kegg = str(row["Source"])
-        target_kegg = str(row["Target"])
+# =========================================================
+# BUILD GRAPH
+# =========================================================
 
-        node_classification = "protein"
+G = nx.DiGraph()
 
-        if "GErel" in interaction:
-            node_classification = "gene"
+node_metadata = {}
+edge_metadata = {}
 
-        G.add_node(
-            source,
-            node_type="main_chain"
-        )
+# =========================================================
+# MAIN CHAIN
+# =========================================================
 
-        G.add_node(
-            target,
-            node_type="main_chain"
-        )
+for _, row in sheet1.iterrows():
+
+    source = str(row["Source_NodeID"])
+    target = str(row["Target_NodeID"])
+
+    source_kegg = str(row["Source"])
+    target_kegg = str(row["Target"])
+
+    interaction = str(row["Interaction"])
+
+    source_class = "gene" if "GErel" in interaction else "protein"
+    target_class = "gene" if "GErel" in interaction else "protein"
+
+    G.add_node(source)
+    G.add_node(target)
+
+    G.add_edge(
+        source,
+        target,
+        relation=row["RelationID"]
+    )
+
+    node_metadata[source] = {
+        "Node ID": source,
+        "KEGG IDs": source_kegg,
+        "GO IDs": str(row.get("Source_GO_IDs", "")),
+        "GO Labels": str(row.get("Source_GO_Labels", "")),
+        "Classification": source_class,
+        "Degree": G.degree(source)
+    }
+
+    node_metadata[target] = {
+        "Node ID": target,
+        "KEGG IDs": target_kegg,
+        "GO IDs": str(row.get("Target_GO_IDs", "")),
+        "GO Labels": str(row.get("Target_GO_Labels", "")),
+        "Classification": target_class,
+        "Degree": G.degree(target)
+    }
+
+    edge_metadata[str(row["RelationID"])] = {
+        "Relation ID": str(row["RelationID"]),
+        "Cluster ID": str(row["ClusterID"]),
+        "Interaction": interaction,
+        "Source Node": source,
+        "Target Node": target,
+        "Pathway": str(row["Pathway_Name"]),
+        "Source KEGG": source_kegg,
+        "Target KEGG": target_kegg
+    }
+
+# =========================================================
+# CROSS PATHWAY
+# =========================================================
+
+if show_cross_pathway:
+
+    for _, row in sheet2.iterrows():
+
+        source = str(row["Chain_Node"])
+        target = str(row["Connected_Node"])
+
+        G.add_node(target)
 
         G.add_edge(
             source,
             target,
-            relation_id=relation_id,
-            interaction=interaction,
-            edge_type="main_chain"
+            relation=row["RelationID"]
         )
-
-        node_metadata[source] = {
-            "Node ID": source,
-            "KEGG IDs": source_kegg,
-            "GO IDs": row.get("Source_GO_IDs", ""),
-            "GO Labels": row.get("Source_GO_Labels", ""),
-            "Classification": node_classification,
-            "Degree": G.degree(source)
-        }
 
         node_metadata[target] = {
             "Node ID": target,
-            "KEGG IDs": target_kegg,
-            "GO IDs": row.get("Target_GO_IDs", ""),
-            "GO Labels": row.get("Target_GO_Labels", ""),
-            "Classification": node_classification,
+            "KEGG IDs": str(row.get("Target_KEGG_IDs", "")),
+            "GO IDs": str(row.get("Target_GO_IDs", "")),
+            "GO Labels": str(row.get("Target_GO_Labels", "")),
+            "Classification": "cross_pathway",
             "Degree": G.degree(target)
         }
 
-        edge_metadata[relation_id] = {
-            "Relation ID": base_relation_id,
-            "Cluster ID": row["ClusterID"],
-            "Interaction": interaction,
+        edge_metadata[str(row["RelationID"])] = {
+            "Relation ID": str(row["RelationID"]),
+            "Interaction": str(row["Interaction"]),
             "Source Node": source,
             "Target Node": target,
-            "Pathway": row["Pathway_Name"],
-            "Source KEGG": source_kegg,
-            "Target KEGG": target_kegg
+            "Pathway": str(row["Connected_Pathway"]),
+            "Source KEGG": str(row.get("Source_KEGG_IDs", "")),
+            "Target KEGG": str(row.get("Target_KEGG_IDs", ""))
         }
 
-    # =====================================================
-    # CROSS PATHWAY
-    # =====================================================
+# =========================================================
+# GRAPH NODES
+# =========================================================
 
-    if show_cross_pathway:
+nodes = []
 
-        for _, row in sheet2.iterrows():
+for node in G.nodes():
 
-            source = str(row["Chain_Node"])
-            target = str(row["Connected_Node"])
+    degree = G.degree(node)
 
-            interaction = str(row["Interaction"])
+    if node_metadata[node]["Classification"] == "cross_pathway":
 
-            base_relation_id = str(row["RelationID"])
+        color = "#D6E6FF"
+        size = 18
 
-            relation_id = (
-                base_relation_id
-                + " | "
-                + source
-                + " → "
-                + target
-            )
+    else:
 
-            G.add_node(
-                target,
-                node_type="cross_pathway"
-            )
+        color = "#4F8EF7"
+        size = 25 + degree
 
-            G.add_edge(
-                source,
-                target,
-                relation_id=relation_id,
-                interaction=interaction,
-                edge_type="cross_pathway"
-            )
-
-            edge_metadata[relation_id] = {
-                "Relation ID": base_relation_id,
-                "Interaction": interaction,
-                "Connected Pathway": row["Connected_Pathway"],
-                "Source Node": source,
-                "Target Node": target,
-                "Source KEGG": row.get("Source_KEGG_IDs", ""),
-                "Target KEGG": row.get("Target_KEGG_IDs", "")
-            }
-
-    # =====================================================
-    # METRICS
-    # =====================================================
-
-    m1, m2, m3, m4 = st.columns(4)
-
-    with m1:
-        st.metric("Nodes", len(G.nodes()))
-
-    with m2:
-        st.metric("Edges", len(G.edges()))
-
-    with m3:
-        st.metric("Main Chain", len(sheet1))
-
-    with m4:
-        st.metric("Cross Links", len(sheet2))
-
-    # =====================================================
-    # BUILD GRAPH
-    # =====================================================
-
-    nodes = []
-
-    for node in G.nodes():
-
-        degree = G.degree(node)
-
-        node_type = G.nodes[node]["node_type"]
-
-        if node_type == "main_chain":
-
-            color = "#4F8EF7"
-            size = 28 + (degree * 1.5)
-
-        else:
-
-            color = "#D6E6FF"
-            size = 18 + (degree * 0.7)
-
-        nodes.append(
-
-            Node(
-                id=node,
-                label=node,
-                size=size,
-                color=color
-            )
-
+    nodes.append(
+        Node(
+            id=node,
+            label=node,
+            size=size,
+            color=color
         )
-
-    edges = []
-
-    for source, target, data in G.edges(data=True):
-
-        if data["edge_type"] == "main_chain":
-            color = "#4F8EF7"
-        else:
-            color = "#C8DBFF"
-
-        edge_label = data["relation_id"].split("|")[0].strip()
-
-        edges.append(
-
-            Edge(
-                source=source,
-                target=target,
-                label=edge_label,
-                color=color
-            )
-
-        )
-
-    # =====================================================
-    # GRAPH CONFIG
-    # =====================================================
-
-    config = Config(
-        width="100%",
-        height=850,
-        directed=True,
-        physics=True,
-        hierarchical=False,
-        nodeHighlightBehavior=True,
-        highlightColor="#F7A7A6",
-        collapsible=False
     )
 
-    # =====================================================
-    # LAYOUT
-    # =====================================================
+# =========================================================
+# GRAPH EDGES
+# =========================================================
 
-    graph_col, inspector_col = st.columns([5, 1.8])
+edges = []
 
-    # =====================================================
-    # GRAPH
-    # =====================================================
+for source, target, data in G.edges(data=True):
 
-    with graph_col:
+    relation = data["relation"]
 
-        st.markdown(
-            '<div class="network-box">',
-            unsafe_allow_html=True
+    edges.append(
+        Edge(
+            source=source,
+            target=target,
+            label=relation
         )
+    )
 
-        st.subheader("Biological Pathway Workspace")
+# =========================================================
+# GRAPH CONFIG
+# =========================================================
 
-        selected_node = agraph(
-            nodes=nodes,
-            edges=edges,
-            config=config
-        )
+config = Config(
+    width="100%",
+    height=700,
+    directed=True,
+    physics=True,
+    hierarchical=False,
+    nodeHighlightBehavior=True,
+    highlightColor="#4F8EF7",
+    collapsible=False
+)
 
-        # =================================================
-        # EDGE INSPECTOR
-        # =================================================
+# =========================================================
+# CENTER PANEL
+# =========================================================
 
-        st.markdown("---")
-        st.markdown("## Edge Inspector")
+with center_col:
 
-        all_relation_ids = sorted(
-            list(edge_metadata.keys())
-        )
+    st.markdown(
+        '<div class="network-box">',
+        unsafe_allow_html=True
+    )
 
-        st.caption(
-            f"Total Relations in Current Chain: {len(all_relation_ids)}"
-        )
+    st.subheader("Biological Pathway Workspace")
 
-        connected_edges = []
+    selected_node = agraph(
+        nodes=nodes,
+        edges=edges,
+        config=config
+    )
 
-        if selected_node:
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True
+    )
 
-            st.info(
-                f"Showing relations connected to node: {selected_node}"
+# =========================================================
+# RIGHT PANEL
+# =========================================================
+
+with right_col:
+
+    st.markdown(
+        '<div class="inspector-box">',
+        unsafe_allow_html=True
+    )
+
+    st.subheader("Pathway Inspector")
+
+    # =====================================================
+    # NETWORK SUMMARY
+    # =====================================================
+
+    st.markdown("### Network Summary")
+
+    st.write(f"**Nodes:** {len(G.nodes())}")
+    st.write(f"**Edges:** {len(G.edges())}")
+    st.write(f"**Main Chain Relations:** {len(sheet1)}")
+    st.write(f"**Cross Pathway Relations:** {len(sheet2)}")
+
+    st.markdown("---")
+
+    # =====================================================
+    # NODE METADATA
+    # =====================================================
+
+    st.markdown("### Node Metadata")
+
+    if selected_node:
+
+        if selected_node in node_metadata:
+
+            st.success(
+                f"Node Selected: {selected_node}"
             )
 
-            for edge_id, edge_info in edge_metadata.items():
-
-                source_match = (
-                    edge_info.get("Source Node") == selected_node
-                )
-
-                target_match = (
-                    edge_info.get("Target Node") == selected_node
-                )
-
-                if source_match or target_match:
-                    connected_edges.append(edge_id)
-
-        else:
-
-            connected_edges = all_relation_ids
-
-        interaction_options = sorted(
-            list(
-                set(
-                    [
-                        edge_metadata[e]["Interaction"]
-                        for e in connected_edges
-                        if "Interaction" in edge_metadata[e]
-                    ]
-                )
+            st.code(
+                json.dumps(
+                    node_metadata[selected_node],
+                    indent=2
+                ),
+                language="json"
             )
-        )
-
-        interaction_filter = st.multiselect(
-            "Filter Interaction Types",
-            interaction_options
-        )
-
-        filtered_edges = []
-
-        for edge_id in connected_edges:
-
-            edge_info = edge_metadata[edge_id]
-
-            include_edge = True
-
-            if interaction_filter:
-
-                if edge_info.get("Interaction") not in interaction_filter:
-                    include_edge = False
-
-            if include_edge:
-                filtered_edges.append(edge_id)
-
-        selected_edge = st.selectbox(
-            "Select Relation ID",
-            filtered_edges,
-            key="edge_selector"
-        )
-
-        st.markdown(
-            "</div>",
-            unsafe_allow_html=True
-        )
-
-    # =====================================================
-    # INSPECTOR PANEL
-    # =====================================================
-
-    with inspector_col:
-
-        st.markdown(
-            '<div class="inspector-box">',
-            unsafe_allow_html=True
-        )
-
-        st.subheader("Pathway Inspector")
-
-        # =================================================
-        # NODE DETAILS
-        # =================================================
-
-        st.markdown("### Node Metadata")
-
-        if selected_node:
-
-            if selected_node in node_metadata:
-
-                st.success(
-                    f"Node Selected: {selected_node}"
-                )
-
-                st.code(
-                    json.dumps(
-                        node_metadata[selected_node],
-                        indent=2
-                    ),
-                    language="json"
-                )
-
-            else:
-
-                st.info(
-                    "Node metadata unavailable."
-                )
 
         else:
 
             st.info(
-                "Click a node in the graph."
+                "Node metadata unavailable."
             )
 
-        # =================================================
-        # EDGE DETAILS
-        # =================================================
+    else:
 
-        st.markdown("---")
-        st.markdown("### Edge Metadata")
-
-        if selected_edge:
-
-            edge_info = edge_metadata.get(selected_edge)
-
-            if edge_info:
-
-                st.success(
-                    f"Edge Selected: {edge_info['Relation ID']}"
-                )
-
-                st.code(
-                    json.dumps(
-                        edge_info,
-                        indent=2
-                    ),
-                    language="json"
-                )
-
-            else:
-
-                st.info(
-                    "Edge metadata unavailable."
-                )
-
-        st.markdown(
-            "</div>",
-            unsafe_allow_html=True
+        st.info(
+            "Click a node in the graph."
         )
+
+    st.markdown("---")
 
     # =====================================================
-    # TABLES
+    # EDGE INSPECTOR
     # =====================================================
 
-    with st.expander("Main Chain Relations Table"):
+    st.markdown("### Edge Inspector")
 
-        st.dataframe(
-            sheet1,
-            use_container_width=True,
-            height=450
+    all_relation_ids = sorted(
+        list(edge_metadata.keys())
+    )
+
+    connected_edges = []
+
+    if selected_node:
+
+        st.info(
+            f"Relations connected to node: {selected_node}"
         )
 
-    with st.expander("Cross Pathway Connections Table"):
+        for edge_id, edge_info in edge_metadata.items():
 
-        st.dataframe(
-            sheet2,
-            use_container_width=True,
-            height=450
+            source_match = (
+                edge_info.get("Source Node") == selected_node
+            )
+
+            target_match = (
+                edge_info.get("Target Node") == selected_node
+            )
+
+            if source_match or target_match:
+                connected_edges.append(edge_id)
+
+    else:
+
+        connected_edges = all_relation_ids
+
+    interaction_options = sorted(
+        list(
+            set(
+                [
+                    edge_metadata[e]["Interaction"]
+                    for e in connected_edges
+                    if "Interaction" in edge_metadata[e]
+                ]
+            )
         )
+    )
+
+    interaction_filter = st.multiselect(
+        "Filter Interaction Types",
+        interaction_options,
+        key="interaction_filter"
+    )
+
+    filtered_edges = []
+
+    for edge_id in connected_edges:
+
+        edge_info = edge_metadata[edge_id]
+
+        include_edge = True
+
+        if interaction_filter:
+
+            if edge_info.get("Interaction") not in interaction_filter:
+                include_edge = False
+
+        if include_edge:
+            filtered_edges.append(edge_id)
+
+    edge_options = []
+
+    for edge_id in filtered_edges:
+
+        edge_info = edge_metadata[edge_id]
+
+        edge_options.append(
+            f"{edge_id} | "
+            f"{edge_info['Source Node']} → "
+            f"{edge_info['Target Node']}"
+        )
+
+    selected_edge_label = st.selectbox(
+        "Select Relation ID",
+        edge_options,
+        key="edge_selector"
+    )
+
+    selected_edge = selected_edge_label.split("|")[0].strip()
+
+    st.markdown("---")
+
+    # =====================================================
+    # EDGE METADATA
+    # =====================================================
+
+    st.markdown("### Edge Metadata")
+
+    if selected_edge:
+
+        edge_info = edge_metadata.get(selected_edge)
+
+        if edge_info:
+
+            st.success(
+                f"Edge Selected: {edge_info['Relation ID']}"
+            )
+
+            st.code(
+                json.dumps(
+                    edge_info,
+                    indent=2
+                ),
+                language="json"
+            )
+
+        else:
+
+            st.info(
+                "Edge metadata unavailable."
+            )
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True
+    )
+
+# =========================================================
+# TABLES
+# =========================================================
+
+with st.expander("Main Chain Relations Table"):
+
+    st.dataframe(
+        sheet1,
+        use_container_width=True,
+        height=400
+    )
+
+with st.expander("Cross Pathway Connections Table"):
+
+    st.dataframe(
+        sheet2,
+        use_container_width=True,
+        height=400
+    )
