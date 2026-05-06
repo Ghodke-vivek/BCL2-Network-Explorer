@@ -88,17 +88,24 @@ def build_network(
     )
 
     # =====================================
-    # BUILD MAIN CHAIN ONLY
+    # BUILD MAIN CHAIN
     # =====================================
 
     main_chain_nodes = set()
 
     for _, row in df_main.iterrows():
 
-        source = str(row["Source_NodeID"])
-        target = str(row["Target_NodeID"])
+        source = str(
+            row["Source_NodeID"]
+        )
 
-        interaction = str(row["Interaction"])
+        target = str(
+            row["Target_NodeID"]
+        )
+
+        interaction = str(
+            row["Interaction"]
+        )
 
         main_chain_nodes.add(source)
         main_chain_nodes.add(target)
@@ -106,9 +113,15 @@ def build_network(
         G.add_edge(
             source,
             target,
+
             interaction=interaction,
-            color=get_edge_color(interaction),
+
+            color=get_edge_color(
+                interaction
+            ),
+
             width=5,
+
             contextual=False
         )
 
@@ -128,16 +141,19 @@ def build_network(
                 row["Connected_Node"]
             )
 
-            # ONLY connect to chain node
+            # ONLY contextual attachment
             # NO recursive expansion
-            # NO secondary edges
 
             G.add_edge(
                 chain_node,
                 connected_node,
+
                 interaction="Cross Pathway",
-                color="#888888",
+
+                color="#777777",
+
                 width=1,
+
                 contextual=True
             )
 
@@ -154,15 +170,16 @@ def build_network(
     )
 
     # =====================================
-    # BETTER PHYSICS
+    # STABLE PROFESSIONAL PHYSICS
     # =====================================
 
-    net.barnes_hut(
-        gravity=-1800,
-        central_gravity=0.25,
-        spring_length=160,
-        spring_strength=0.015,
-        damping=0.15
+    net.force_atlas_2based(
+        gravity=-45,
+        central_gravity=0.003,
+        spring_length=220,
+        spring_strength=0.01,
+        damping=0.9,
+        overlap=0.1
     )
 
     # =====================================
@@ -183,8 +200,6 @@ def build_network(
 
         degree = info["connections"]
 
-        is_cross = info["cross_node"]
-
         # =================================
         # MAIN CHAIN NODES
         # =================================
@@ -193,7 +208,7 @@ def build_network(
 
             size = 28 + (degree * 2)
 
-            color = "#3FA7FF"
+            color = "#4DA6FF"
 
             shape = "dot"
 
@@ -218,22 +233,22 @@ def build_network(
                 border_color = "#FFAA00"
 
         # =================================
-        # CONTEXTUAL CROSS NODES
+        # CROSS PATHWAY NODES
         # =================================
 
         else:
 
-            size = 12
+            size = 10
 
-            color = "#AA88FF"
+            color = "#8C7AE6"
 
             shape = "dot"
 
-            opacity = 0.45
+            opacity = 0.35
 
             border_width = 1
 
-            border_color = "#BBBBBB"
+            border_color = "#AAAAAA"
 
         # =================================
         # SELECTED NODE
@@ -275,7 +290,7 @@ def build_network(
             opacity=opacity,
 
             font={
-                "size": 18,
+                "size": 15,
                 "face": "arial",
                 "color": "white"
             }
@@ -291,7 +306,7 @@ def build_network(
 
         dashes = False
 
-        smooth_type = "dynamic"
+        smooth_type = "continuous"
 
         if contextual:
 
@@ -315,36 +330,75 @@ def build_network(
 
             smooth={
                 "enabled": True,
-                "type": smooth_type
+                "type": smooth_type,
+                "roundness": 0.15
             }
         )
 
     # =====================================
-    # OPTIONS
+    # ADVANCED OPTIONS
     # =====================================
 
     net.set_options("""
     {
+      "layout": {
+
+        "improvedLayout": true
+      },
+
       "interaction": {
 
         "hover": true,
 
-        "tooltipDelay": 150,
+        "tooltipDelay": 120,
 
         "navigationButtons": true,
 
-        "keyboard": true
+        "keyboard": true,
+
+        "dragNodes": true,
+
+        "dragView": true,
+
+        "zoomView": true
       },
 
       "physics": {
 
         "enabled": true,
 
+        "solver": "forceAtlas2Based",
+
+        "forceAtlas2Based": {
+
+          "gravitationalConstant": -45,
+
+          "centralGravity": 0.003,
+
+          "springLength": 220,
+
+          "springConstant": 0.01,
+
+          "damping": 0.9,
+
+          "avoidOverlap": 0.15
+        },
+
         "stabilization": {
 
           "enabled": true,
 
-          "iterations": 120
+          "iterations": 250
+        }
+      },
+
+      "nodes": {
+
+        "shadow": false,
+
+        "font": {
+
+          "size": 16
         }
       },
 
@@ -352,19 +406,20 @@ def build_network(
 
         "smooth": {
 
-          "enabled": true
-        }
-      },
+          "enabled": true,
 
-      "nodes": {
+          "type": "continuous",
 
-        "shadow": true
+          "roundness": 0.15
+        },
+
+        "shadow": false
       }
     }
     """)
 
     # =====================================
-    # SAVE
+    # SAVE HTML
     # =====================================
 
     temp_file = tempfile.NamedTemporaryFile(
@@ -372,7 +427,9 @@ def build_network(
         suffix=".html"
     )
 
-    net.save_graph(temp_file.name)
+    net.save_graph(
+        temp_file.name
+    )
 
     return open(
         temp_file.name,
