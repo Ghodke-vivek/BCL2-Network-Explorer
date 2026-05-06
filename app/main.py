@@ -2,8 +2,13 @@ import streamlit as st
 import pandas as pd
 import os
 
-from graph_builder import build_network
-from node_metadata import build_node_metadata
+from cytoscape_builder import (
+    render_cytoscape
+)
+
+from node_metadata import (
+    build_node_metadata
+)
 
 from ui_components import (
     render_header,
@@ -45,9 +50,16 @@ network_type = st.sidebar.radio(
     ["Upstream", "Downstream"]
 )
 
+# =========================================
+# DATA FOLDER
+# =========================================
+
 if network_type == "Upstream":
+
     data_folder = "data/upstream"
+
 else:
+
     data_folder = "data/downstream"
 
 
@@ -56,7 +68,9 @@ else:
 # =========================================
 
 files = sorted([
+
     f for f in os.listdir(data_folder)
+
     if f.endswith(".xlsx")
 ])
 
@@ -87,6 +101,10 @@ file_path = os.path.join(
 
 try:
 
+    # =====================================
+    # LOAD EXCEL FILES
+    # =====================================
+
     df_main = pd.read_excel(
         file_path,
         sheet_name=0
@@ -96,6 +114,10 @@ try:
         file_path,
         sheet_name=1
     )
+
+    # =====================================
+    # BUILD NODE METADATA
+    # =====================================
 
     metadata = build_node_metadata(
         df_main,
@@ -116,7 +138,7 @@ try:
     )
 
     # =====================================
-    # LAYOUT
+    # MAIN LAYOUT
     # =====================================
 
     graph_col, info_col = st.columns(
@@ -133,21 +155,20 @@ try:
             "Interactive Biological Network"
         )
 
-        html_graph = build_network(
+        selected_element = render_cytoscape(
             df_main,
             df_cross,
-            include_cross_nodes,
-            selected_node
+            metadata,
+            include_cross_nodes
         )
 
-        st.components.v1.html(
-            html_graph,
-            height=950,
-            scrolling=True
+        st.write(
+            "Selected Element:",
+            selected_element
         )
 
     # =====================================
-    # METADATA PANEL
+    # RIGHT PANEL
     # =====================================
 
     with info_col:
@@ -156,7 +177,14 @@ try:
             "Biological Annotation Explorer"
         )
 
-        node_info = metadata[selected_node]
+        node_info = metadata.get(
+            selected_node,
+            {}
+        )
+
+        # =================================
+        # NODE INFO
+        # =================================
 
         st.markdown(
             "## Node Information"
@@ -165,26 +193,39 @@ try:
         st.code(selected_node)
 
         st.write(
-            f"Type: {node_info['type']}"
+            f"Type: {node_info.get('type', '')}"
         )
 
         st.write(
-            f"Connections: {node_info['connections']}"
+            f"Connections: "
+            f"{node_info.get('connections', '')}"
         )
 
         st.write(
-            f"Cross Pathway: {node_info['cross_node']}"
+            f"Cross Pathway: "
+            f"{node_info.get('cross_node', '')}"
         )
+
+        # =================================
+        # KEGG IDS
+        # =================================
 
         st.markdown("---")
 
-        st.markdown("## KEGG IDs")
+        st.markdown(
+            "## KEGG IDs"
+        )
 
-        for kid in node_info[
-            "kegg_ids"
-        ]:
+        for kid in node_info.get(
+            "kegg_ids",
+            []
+        ):
 
             st.code(kid)
+
+        # =================================
+        # BIOLOGICAL METADATA
+        # =================================
 
         st.markdown("---")
 
@@ -192,14 +233,15 @@ try:
             "## Biological Metadata"
         )
 
-        if node_info[
-            "biological_data"
-        ]:
+        biological_data = node_info.get(
+            "biological_data",
+            []
+        )
+
+        if biological_data:
 
             for idx, item in enumerate(
-                node_info[
-                    "biological_data"
-                ]
+                biological_data
             ):
 
                 with st.expander(
@@ -261,13 +303,25 @@ try:
                         )
                     )
 
+        # =================================
+        # RELATION EXPLORER
+        # =================================
+
         render_relation_explorer(
             selected_node,
             df_main,
             df_cross
         )
 
+        # =================================
+        # LEGEND
+        # =================================
+
         render_legend()
+
+# =========================================
+# ERROR HANDLING
+# =========================================
 
 except Exception as e:
 
