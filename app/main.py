@@ -156,17 +156,56 @@ try:
         )
 
         selected_element = render_cytoscape(
-            df_main,
-            df_cross,
-            metadata,
-            include_cross_nodes
-        )
+    df_main,
+    df_cross,
+    metadata,
+    include_cross_nodes
+)
 
-        st.write(
-            "Selected Element:",
-            selected_element
-        )
+# =====================================
+# STORE SELECTION
+# =====================================
 
+if selected_element:
+
+    st.session_state[
+        "selected_element"
+    ] = selected_element
+
+# =====================================
+# LOAD SELECTION
+# =====================================
+
+selected_element = st.session_state.get(
+    "selected_element",
+    {}
+)
+
+st.write(
+    "Selected Element:",
+    selected_element
+)
+
+# =====================================
+# AUTO NODE SELECTION
+# =====================================
+
+try:
+
+    selected_nodes = selected_element.get(
+        "nodes",
+        []
+    )
+
+    if selected_nodes:
+
+        selected_node = selected_nodes[0].get(
+            "data",
+            {}
+        ).get("id", selected_node)
+
+except:
+    pass
     # =====================================
     # RIGHT PANEL
     # =====================================
