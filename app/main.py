@@ -238,7 +238,9 @@ if selected_file:
             "Interaction": interaction,
             "Source Node": source,
             "Target Node": target,
-            "Pathway": row["Pathway_Name"]
+            "Pathway": row["Pathway_Name"],
+            "Source KEGG": source_kegg,
+            "Target KEGG": target_kegg
         }
 
     # =====================================================
@@ -272,7 +274,9 @@ if selected_file:
                 "Interaction": row["Interaction"],
                 "Connected Pathway": row["Connected_Pathway"],
                 "Source Node": source,
-                "Target Node": target
+                "Target Node": target,
+                "Source KEGG": row.get("Source_KEGG_IDs", ""),
+                "Target KEGG": row.get("Target_KEGG_IDs", "")
             }
 
     # =====================================================
@@ -294,7 +298,7 @@ if selected_file:
         st.metric("Cross Links", len(sheet2))
 
     # =====================================================
-    # BUILD AGRAPH NODES
+    # BUILD NODES
     # =====================================================
 
     nodes = []
@@ -327,7 +331,7 @@ if selected_file:
         )
 
     # =====================================================
-    # BUILD AGRAPH EDGES
+    # BUILD EDGES
     # =====================================================
 
     edges = []
@@ -369,7 +373,7 @@ if selected_file:
     )
 
     # =====================================================
-    # MAIN LAYOUT
+    # LAYOUT
     # =====================================================
 
     graph_col, inspector_col = st.columns([5, 1.8])
@@ -393,6 +397,15 @@ if selected_file:
             config=config
         )
 
+        st.markdown("### Edge Inspector")
+
+        edge_ids = list(edge_metadata.keys())
+
+        selected_edge = st.selectbox(
+            "Select Relation ID",
+            edge_ids
+        )
+
         st.markdown(
             "</div>",
             unsafe_allow_html=True
@@ -410,6 +423,12 @@ if selected_file:
         )
 
         st.subheader("Pathway Inspector")
+
+        # =================================================
+        # NODE METADATA
+        # =================================================
+
+        st.markdown("### Node Metadata")
 
         if selected_node:
 
@@ -430,13 +449,33 @@ if selected_file:
             else:
 
                 st.info(
-                    "Edge selection metadata currently unavailable in streamlit-agraph."
+                    "Selected item not found."
                 )
 
         else:
 
             st.info(
                 "Click a node to inspect metadata."
+            )
+
+        # =================================================
+        # EDGE METADATA
+        # =================================================
+
+        st.markdown("---")
+
+        st.markdown("### Edge Metadata")
+
+        if selected_edge in edge_metadata:
+
+            st.success("Edge Selected")
+
+            st.code(
+                json.dumps(
+                    edge_metadata[selected_edge],
+                    indent=2
+                ),
+                language="json"
             )
 
         st.markdown(
