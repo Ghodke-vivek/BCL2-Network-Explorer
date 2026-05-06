@@ -10,7 +10,7 @@ from node_metadata import build_node_metadata
 # =========================================
 
 st.set_page_config(
-    page_title="BCL2 Network Explorer",
+    page_title="BCL2 Biological Network Explorer",
     layout="wide"
 )
 
@@ -18,15 +18,10 @@ st.set_page_config(
 # TITLE
 # =========================================
 
-st.title("BCL2 Network Explorer")
-
-st.markdown("""
-Interactive visualization of pathway-specific  
-upstream and downstream BCL2 interaction chains.
-""")
+st.title("BCL2 Biological Network Explorer")
 
 # =========================================
-# SIDEBAR
+# SIDEBAR CONTROLS
 # =========================================
 
 st.sidebar.header("Network Controls")
@@ -59,7 +54,7 @@ files = sorted([
 ])
 
 # =========================================
-# FILE SELECTION
+# FILE SELECTOR
 # =========================================
 
 selected_file = st.sidebar.selectbox(
@@ -77,7 +72,7 @@ include_cross_nodes = st.sidebar.checkbox(
 )
 
 # =========================================
-# FULL FILE PATH
+# FILE PATH
 # =========================================
 
 file_path = os.path.join(
@@ -86,14 +81,10 @@ file_path = os.path.join(
 )
 
 # =========================================
-# LOAD DATA
+# LOAD FILES
 # =========================================
 
 try:
-
-    # =====================================
-    # READ SHEETS
-    # =====================================
 
     df_main = pd.read_excel(
         file_path,
@@ -115,138 +106,229 @@ try:
     )
 
     # =====================================
-    # SIDEBAR NODE SEARCH
+    # NODE SELECTOR
     # =====================================
 
     all_nodes = sorted(metadata.keys())
 
     selected_node = st.sidebar.selectbox(
-        "Search Node ID",
-        ["None"] + all_nodes
+        "Select Node ID",
+        all_nodes
     )
 
     # =====================================
-    # FILE INFO
+    # MAIN LAYOUT
     # =====================================
 
-    st.subheader("Selected File")
-
-    st.info(selected_file)
-
-    # =====================================
-    # NETWORK STATS
-    # =====================================
-
-    total_main_edges = len(df_main)
-
-    total_cross_edges = len(df_cross)
-
-    total_nodes = len(metadata)
-
-    gene_nodes = sum(
-        1 for n in metadata.values()
-        if n["type"] == "Gene"
-    )
-
-    cross_nodes = sum(
-        1 for n in metadata.values()
-        if n["cross_node"]
+    left_col, right_col = st.columns(
+        [2.2, 1]
     )
 
     # =====================================
-    # METRIC DISPLAY
+    # LEFT SIDE = GRAPH
     # =====================================
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    with left_col:
 
-    col1.metric("Main Edges", total_main_edges)
+        st.subheader("Network Visualization")
 
-    col2.metric("Cross Edges", total_cross_edges)
+        html_graph = build_network(
+            df_main,
+            df_cross,
+            include_cross_nodes
+        )
 
-    col3.metric("Total Nodes", total_nodes)
-
-    col4.metric("Gene Nodes", gene_nodes)
-
-    col5.metric("Cross Nodes", cross_nodes)
+        st.components.v1.html(
+            html_graph,
+            height=950,
+            scrolling=True
+        )
 
     # =====================================
-    # NODE DETAILS PANEL
+    # RIGHT SIDE = BIOLOGICAL EXPLORER
     # =====================================
 
-    if selected_node != "None":
+    with right_col:
 
-        st.subheader("Selected Node Metadata")
+        st.subheader("Biological Annotation Explorer")
 
         node_info = metadata[selected_node]
 
-        st.json({
-            "Node_ID": selected_node,
-            "Type": node_info["type"],
-            "Connections": node_info["connections"],
-            "Cross_Pathway_Node": node_info["cross_node"]
-        })
+        # =================================
+        # BASIC NODE INFO
+        # =================================
 
-    # =====================================
-    # MAIN CHAIN TABLE
-    # =====================================
+        st.markdown("## Node Information")
 
-    with st.expander("Sheet 1: Main Chain Relations"):
+        st.write("### Node ID")
+        st.code(selected_node)
 
-        st.write(f"Rows: {len(df_main)}")
+        st.write("### Node Type")
+        st.write(node_info["type"])
 
-        st.dataframe(
-            df_main,
-            use_container_width=True
+        st.write("### Connections")
+        st.write(node_info["connections"])
+
+        st.write("### Cross Pathway Node")
+        st.write(node_info["cross_node"])
+
+        # =================================
+        # KEGG IDS
+        # =================================
+
+        st.markdown("---")
+        st.markdown("## KEGG IDs")
+
+        if node_info["kegg_ids"]:
+
+            for kid in node_info["kegg_ids"]:
+                st.code(kid)
+
+        else:
+            st.info("No KEGG IDs found")
+
+        # =================================
+        # BIOLOGICAL METADATA
+        # =================================
+
+        st.markdown("---")
+        st.markdown("## Biological Metadata")
+
+        if node_info["biological_data"]:
+
+            for idx, item in enumerate(
+                node_info["biological_data"]
+            ):
+
+                with st.expander(
+                    f"Metadata Entry {idx + 1}"
+                ):
+
+                    st.write("### Names")
+                    st.write(
+                        item.get("Names", "")
+                    )
+
+                    st.write("### HSA Symbols")
+                    st.write(
+                        item.get(
+                            "HSA_Symbols",
+                            ""
+                        )
+                    )
+
+                    st.write(
+                        "### HSA Biological Names"
+                    )
+                    st.write(
+                        item.get(
+                            "HSA_Biological_Names",
+                            ""
+                        )
+                    )
+
+                    st.write("### UniProt IDs")
+                    st.write(
+                        item.get(
+                            "UniProt_IDs",
+                            ""
+                        )
+                    )
+
+                    st.write("### GO IDs")
+                    st.write(
+                        item.get(
+                            "GO_IDs",
+                            ""
+                        )
+                    )
+
+                    st.write("### GO Labels")
+                    st.write(
+                        item.get(
+                            "GO_Labels",
+                            ""
+                        )
+                    )
+
+                    st.write("### EC Number")
+                    st.write(
+                        item.get(
+                            "EC_Number",
+                            ""
+                        )
+                    )
+
+        else:
+
+            st.warning(
+                "No biological metadata found"
+            )
+
+        # =================================
+        # RELATION EXPLORER
+        # =================================
+
+        st.markdown("---")
+        st.markdown("## Relation Explorer")
+
+        related_main = df_main[
+            (
+                df_main["Source_NodeID"]
+                == selected_node
+            )
+            |
+            (
+                df_main["Target_NodeID"]
+                == selected_node
+            )
+        ]
+
+        related_cross = df_cross[
+            (
+                df_cross["Chain_Node"]
+                == selected_node
+            )
+            |
+            (
+                df_cross["Connected_Node"]
+                == selected_node
+            )
+        ]
+
+        st.write(
+            "### Main Chain Relations"
         )
 
-    # =====================================
-    # CROSS PATHWAY TABLE
-    # =====================================
+        if len(related_main) > 0:
 
-    with st.expander("Sheet 2: Cross Pathway Nodes"):
+            st.dataframe(
+                related_main,
+                use_container_width=True
+            )
 
-        st.write(f"Rows: {len(df_cross)}")
+        else:
 
-        st.dataframe(
-            df_cross,
-            use_container_width=True
+            st.info(
+                "No main chain relations"
+            )
+
+        st.write(
+            "### Cross Pathway Relations"
         )
 
-    # =====================================
-    # LEGEND
-    # =====================================
+        if len(related_cross) > 0:
 
-    st.subheader("Network Legend")
+            st.dataframe(
+                related_cross,
+                use_container_width=True
+            )
 
-    st.markdown("""
-    - 🟢 / Cyan → Gene Nodes  
-    - 🔵 → Protein / General Nodes  
-    - 🩷 → Cross Pathway Nodes  
+        else:
 
-    Edge Colors:
-    - Green → Activation  
-    - Red → Inhibition  
-    - Blue → Expression  
-    - Gray → Other / Cross Pathway  
-    """)
-
-    # =====================================
-    # GRAPH SECTION
-    # =====================================
-
-    st.subheader("Interactive Network Visualization")
-
-    html_graph = build_network(
-        df_main,
-        df_cross,
-        include_cross_nodes
-    )
-
-    st.components.v1.html(
-        html_graph,
-        height=950,
-        scrolling=True
-    )
+            st.info(
+                "No cross pathway relations"
+            )
 
 # =========================================
 # ERROR HANDLING
@@ -254,6 +336,8 @@ try:
 
 except Exception as e:
 
-    st.error("Error loading or visualizing network")
+    st.error(
+        "Error loading biological explorer"
+    )
 
     st.exception(e)
