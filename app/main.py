@@ -3,6 +3,7 @@ import pandas as pd
 import os
 
 from graph_builder import build_network
+from node_metadata import build_node_metadata
 
 # =========================================
 # PAGE CONFIG
@@ -19,8 +20,19 @@ st.set_page_config(
 
 st.title("BCL2 Network Explorer")
 
+st.markdown("""
+Interactive visualization of pathway-specific  
+upstream and downstream BCL2 interaction chains.
+""")
+
 # =========================================
-# SELECT NETWORK TYPE
+# SIDEBAR
+# =========================================
+
+st.sidebar.header("Network Controls")
+
+# =========================================
+# NETWORK TYPE
 # =========================================
 
 network_type = st.sidebar.radio(
@@ -29,7 +41,7 @@ network_type = st.sidebar.radio(
 )
 
 # =========================================
-# FOLDER PATHS
+# DATA PATH
 # =========================================
 
 if network_type == "Upstream":
@@ -38,7 +50,7 @@ else:
     data_folder = "data/downstream"
 
 # =========================================
-# GET FILE LIST
+# FILE LIST
 # =========================================
 
 files = sorted([
@@ -47,12 +59,21 @@ files = sorted([
 ])
 
 # =========================================
-# FILE SELECTOR
+# FILE SELECTION
 # =========================================
 
 selected_file = st.sidebar.selectbox(
     "Select Pathway File",
     files
+)
+
+# =========================================
+# CROSS NODE OPTION
+# =========================================
+
+include_cross_nodes = st.sidebar.checkbox(
+    "Include Cross Pathway Nodes",
+    value=False
 )
 
 # =========================================
@@ -65,7 +86,7 @@ file_path = os.path.join(
 )
 
 # =========================================
-# LOAD EXCEL FILE
+# LOAD DATA
 # =========================================
 
 try:
@@ -85,52 +106,135 @@ try:
     )
 
     # =====================================
+    # BUILD NODE METADATA
+    # =====================================
+
+    metadata = build_node_metadata(
+        df_main,
+        df_cross
+    )
+
+    # =====================================
+    # SIDEBAR NODE SEARCH
+    # =====================================
+
+    all_nodes = sorted(metadata.keys())
+
+    selected_node = st.sidebar.selectbox(
+        "Search Node ID",
+        ["None"] + all_nodes
+    )
+
+    # =====================================
     # FILE INFO
     # =====================================
 
     st.subheader("Selected File")
-    st.write(selected_file)
+
+    st.info(selected_file)
+
+    # =====================================
+    # NETWORK STATS
+    # =====================================
+
+    total_main_edges = len(df_main)
+
+    total_cross_edges = len(df_cross)
+
+    total_nodes = len(metadata)
+
+    gene_nodes = sum(
+        1 for n in metadata.values()
+        if n["type"] == "Gene"
+    )
+
+    cross_nodes = sum(
+        1 for n in metadata.values()
+        if n["cross_node"]
+    )
+
+    # =====================================
+    # METRIC DISPLAY
+    # =====================================
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    col1.metric("Main Edges", total_main_edges)
+
+    col2.metric("Cross Edges", total_cross_edges)
+
+    col3.metric("Total Nodes", total_nodes)
+
+    col4.metric("Gene Nodes", gene_nodes)
+
+    col5.metric("Cross Nodes", cross_nodes)
+
+    # =====================================
+    # NODE DETAILS PANEL
+    # =====================================
+
+    if selected_node != "None":
+
+        st.subheader("Selected Node Metadata")
+
+        node_info = metadata[selected_node]
+
+        st.json({
+            "Node_ID": selected_node,
+            "Type": node_info["type"],
+            "Connections": node_info["connections"],
+            "Cross_Pathway_Node": node_info["cross_node"]
+        })
 
     # =====================================
     # MAIN CHAIN TABLE
     # =====================================
 
-    st.subheader("Sheet 1: Main Chain Relations")
+    with st.expander("Sheet 1: Main Chain Relations"):
 
-    st.write(f"Rows: {len(df_main)}")
+        st.write(f"Rows: {len(df_main)}")
 
-    st.dataframe(
-        df_main.head(),
-        use_container_width=True
-    )
+        st.dataframe(
+            df_main,
+            use_container_width=True
+        )
 
     # =====================================
     # CROSS PATHWAY TABLE
     # =====================================
 
-    st.subheader("Sheet 2: Cross Pathway Nodes")
+    with st.expander("Sheet 2: Cross Pathway Nodes"):
 
-    st.write(f"Rows: {len(df_cross)}")
+        st.write(f"Rows: {len(df_cross)}")
 
-    st.dataframe(
-        df_cross.head(),
-        use_container_width=True
-    )
+        st.dataframe(
+            df_cross,
+            use_container_width=True
+        )
 
     # =====================================
-    # CROSS NODE OPTION
+    # LEGEND
     # =====================================
 
-    include_cross_nodes = st.checkbox(
-        "Include Cross Pathway Nodes",
-        value=True
-    )
+    st.subheader("Network Legend")
+
+    st.markdown("""
+    - 🟢 / Cyan → Gene Nodes  
+    - 🔵 → Protein / General Nodes  
+    - 🩷 → Cross Pathway Nodes  
+
+    Edge Colors:
+    - Green → Activation  
+    - Red → Inhibition  
+    - Blue → Expression  
+    - Gray → Other / Cross Pathway  
+    """)
 
     # =====================================
     # GRAPH SECTION
     # =====================================
 
-    st.subheader("Network Visualization")
+    st.subheader("Interactive Network Visualization")
 
     html_graph = build_network(
         df_main,
@@ -150,6 +254,6 @@ try:
 
 except Exception as e:
 
-    st.error("Error loading or visualizing file")
+    st.error("Error loading or visualizing network")
 
     st.exception(e)
