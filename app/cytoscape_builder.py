@@ -105,7 +105,7 @@ def build_elements(
 
         # =================================
         # TARGET NODE
-        # =====================================
+        # =================================
 
         if target not in added_nodes:
 
@@ -153,7 +153,7 @@ def build_elements(
 
         # =================================
         # EDGE
-        # =====================================
+        # =================================
 
         elements.append({
 
@@ -291,13 +291,22 @@ def render_cytoscape(
 
     selected = cytoscape(
 
-        elements,
+        elements=elements,
 
-        layout_name="cose",
+        layout={
+            "name": "cose"
+        },
 
         stylesheet=[],
 
-        height="950px",
+        style={
+
+            "width": "100%",
+
+            "height": "950px",
+
+            "background-color": "#0B0F1A"
+        },
 
         key="bcl2_network"
     )
