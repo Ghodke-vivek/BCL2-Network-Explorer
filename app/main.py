@@ -76,6 +76,24 @@ st.markdown(
         overflow-y: auto;
     }
 
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #1D1D1F !important;
+    }
+
+    div[data-baseweb="popover"] {
+        background-color: #FFFFFF !important;
+    }
+
+    div[role="listbox"] {
+        background-color: #FFFFFF !important;
+    }
+
+    div[role="option"] {
+        background-color: #FFFFFF !important;
+        color: #1D1D1F !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
@@ -399,11 +417,12 @@ if selected_file:
 
         st.markdown("### Edge Inspector")
 
-        edge_ids = list(edge_metadata.keys())
+        edge_ids = sorted(list(edge_metadata.keys()))
 
         selected_edge = st.selectbox(
             "Select Relation ID",
-            edge_ids
+            edge_ids,
+            key="edge_selector"
         )
 
         st.markdown(
@@ -436,7 +455,7 @@ if selected_file:
 
             if selected_id in node_metadata:
 
-                st.success("Node Selected")
+                st.success(f"Node Selected: {selected_id}")
 
                 st.code(
                     json.dumps(
@@ -449,7 +468,7 @@ if selected_file:
             else:
 
                 st.info(
-                    "Selected item not found."
+                    "Selected node metadata not found."
                 )
 
         else:
@@ -466,17 +485,27 @@ if selected_file:
 
         st.markdown("### Edge Metadata")
 
-        if selected_edge in edge_metadata:
+        if selected_edge:
 
-            st.success("Edge Selected")
+            edge_info = edge_metadata.get(selected_edge)
 
-            st.code(
-                json.dumps(
-                    edge_metadata[selected_edge],
-                    indent=2
-                ),
-                language="json"
-            )
+            if edge_info:
+
+                st.success(f"Edge Selected: {selected_edge}")
+
+                st.code(
+                    json.dumps(
+                        edge_info,
+                        indent=2
+                    ),
+                    language="json"
+                )
+
+            else:
+
+                st.info(
+                    "Edge metadata not found."
+                )
 
         st.markdown(
             "</div>",
