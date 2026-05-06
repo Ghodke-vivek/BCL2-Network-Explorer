@@ -67,8 +67,26 @@ st.markdown(
         border-radius: 24px;
         padding: 20px;
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
-        height: 950px;
+        min-height: 920px;
         overflow-y: auto;
+    }
+
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #1D1D1F !important;
+    }
+
+    div[data-baseweb="popover"] {
+        background-color: #FFFFFF !important;
+    }
+
+    div[role="listbox"] {
+        background-color: #FFFFFF !important;
+    }
+
+    div[role="option"] {
+        background-color: #FFFFFF !important;
+        color: #1D1D1F !important;
     }
 
     </style>
@@ -128,7 +146,7 @@ show_cross_pathway = st.sidebar.toggle(
 )
 
 # =========================================================
-# FILES
+# LOAD FILES
 # =========================================================
 
 if network_type == "Upstream":
@@ -289,10 +307,14 @@ if selected_file:
         st.metric("Cross Links", len(sheet2))
 
     # =====================================================
-    # CYTOSCAPE ELEMENTS
+    # ELEMENTS
     # =====================================================
 
     elements = []
+
+    # =====================================================
+    # NODES
+    # =====================================================
 
     for node in G.nodes():
 
@@ -316,20 +338,16 @@ if selected_file:
             "data": {
                 "id": node,
                 "label": node,
-                "degree": degree
-            },
-            "style": {
-                "background-color": color,
-                "width": size,
-                "height": size,
-                "shape": shape,
-                "label": node,
-                "font-size": "10px",
-                "color": "#1D1D1F",
-                "text-valign": "center",
-                "text-halign": "center"
+                "degree": degree,
+                "color": color,
+                "size": size,
+                "shape": shape
             }
         })
+
+    # =====================================================
+    # EDGES
+    # =====================================================
 
     for source, target, data in G.edges(data=True):
 
@@ -348,16 +366,47 @@ if selected_file:
                 "id": data["relation_id"],
                 "source": source,
                 "target": target,
-                "label": data["relation_id"]
-            },
-            "style": {
-                "line-color": edge_color,
-                "target-arrow-color": edge_color,
-                "target-arrow-shape": "triangle",
-                "curve-style": "bezier",
+                "label": data["relation_id"],
+                "color": edge_color,
                 "width": width
             }
         })
+
+    # =====================================================
+    # STYLESHEET
+    # =====================================================
+
+    stylesheet = [
+
+        {
+            "selector": "node",
+            "style": {
+                "label": "data(label)",
+                "text-valign": "center",
+                "text-halign": "center",
+                "font-size": 10,
+                "color": "#1D1D1F",
+                "border-width": 2,
+                "border-color": "#FFFFFF",
+                "background-color": "data(color)",
+                "width": "data(size)",
+                "height": "data(size)",
+                "shape": "data(shape)"
+            }
+        },
+
+        {
+            "selector": "edge",
+            "style": {
+                "curve-style": "bezier",
+                "target-arrow-shape": "triangle",
+                "line-color": "data(color)",
+                "target-arrow-color": "data(color)",
+                "width": "data(width)"
+            }
+        }
+
+    ]
 
     # =====================================================
     # LAYOUT
@@ -379,18 +428,8 @@ if selected_file:
         st.subheader("Biological Pathway Workspace")
 
         selected = st_cytoscapejs(
-            elements=elements,
-            stylesheet=[],
-            layout={
-                "name": "cose",
-                "animate": True,
-                "padding": 60,
-                "nodeRepulsion": 800000,
-                "idealEdgeLength": 130,
-                "gravity": 0.25
-            },
-            height="920px",
-            key="cytoscape"
+            elements,
+            stylesheet
         )
 
         st.markdown(
@@ -415,8 +454,9 @@ if selected_file:
 
             selected_id = None
 
-            if "id" in selected:
-                selected_id = selected["id"]
+            if isinstance(selected, dict):
+
+                selected_id = selected.get("id")
 
             # =================================================
             # NODE
