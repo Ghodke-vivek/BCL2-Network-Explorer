@@ -1,427 +1,526 @@
 import streamlit as st
 import pandas as pd
-import os
+import networkx as nx
+from pathlib import Path
+from streamlit.components.v1 import html
+import json
 
-from cytoscape_builder import (
-    render_cytoscape
-)
-
-from node_metadata import (
-    build_node_metadata
-)
-
-from ui_components import (
-    render_header,
-    render_legend
-)
-
-from relation_explorer import (
-    render_relation_explorer
-)
-
-
-# =========================================
+# =========================================================
 # PAGE CONFIG
-# =========================================
+# =========================================================
 
 st.set_page_config(
-    page_title="BCL2 Explorer",
-    layout="wide"
+    page_title="BCL2 Network Explorer",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
+# =========================================================
+# CUSTOM CSS
+# =========================================================
 
-# =========================================
-# SESSION STATE
-# =========================================
+st.markdown(
+    """
+    <style>
 
-if "selected_element" not in st.session_state:
+    .main {
+        background-color: #EDEEF2;
+    }
 
-    st.session_state[
-        "selected_element"
-    ] = {}
+    .block-container {
+        padding-top: 1.2rem;
+        padding-bottom: 1rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 100%;
+    }
 
-if "selected_node" not in st.session_state:
+    h1, h2, h3 {
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #1D1D1F;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
 
-    st.session_state[
-        "selected_node"
-    ] = None
+    p, div, span, label {
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
 
+    section[data-testid="stSidebar"] {
+        background-color: #FCFCFD;
+        border-right: 1px solid #DADCE3;
+    }
 
-# =========================================
-# HEADER
-# =========================================
+    .network-box {
+        background-color: #FCFCFD;
+        border-radius: 26px;
+        padding: 18px;
+        box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
+    }
 
-render_header()
+    .panel-box {
+        background-color: #FCFCFD;
+        border-radius: 26px;
+        padding: 20px;
+        box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
+    }
 
+    .metric-card {
+        background-color: #FCFCFD;
+        border-radius: 20px;
+        padding: 12px;
+        box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
+    }
 
-# =========================================
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# =========================================================
+# TITLE
+# =========================================================
+
+st.title("BCL2 Network Explorer")
+
+st.markdown(
+    """
+    Interactive biological signaling traversal and pathway crosstalk visualization platform.
+    """
+)
+
+# =========================================================
+# DATA PATHS
+# =========================================================
+
+UPSTREAM_DIR = Path("data/raw/upstream")
+DOWNSTREAM_DIR = Path("data/raw/downstream")
+
+# =========================================================
 # SIDEBAR
-# =========================================
+# =========================================================
 
-st.sidebar.header(
-    "Explorer Controls"
-)
+st.sidebar.title("Network Controls")
 
 network_type = st.sidebar.radio(
-    "Network Type",
+    "Network Direction",
     ["Upstream", "Downstream"]
 )
 
-# =========================================
-# DATA FOLDER
-# =========================================
+# =========================================================
+# LOAD FILES
+# =========================================================
 
 if network_type == "Upstream":
-
-    data_folder = "data/upstream"
-
+    files = sorted(UPSTREAM_DIR.glob("*.xlsx"))
 else:
+    files = sorted(DOWNSTREAM_DIR.glob("*.xlsx"))
 
-    data_folder = "data/downstream"
-
-
-# =========================================
-# FILES
-# =========================================
-
-files = sorted([
-
-    f for f in os.listdir(data_folder)
-
-    if f.endswith(".xlsx")
-])
+file_names = [f.name for f in files]
 
 selected_file = st.sidebar.selectbox(
-    "Pathway File",
-    files
+    "Select Pathway",
+    file_names
 )
 
-include_cross_nodes = st.sidebar.checkbox(
-    "Include Cross Pathway Nodes",
-    value=False
-)
-
-
-# =========================================
-# FILE PATH
-# =========================================
-
-file_path = os.path.join(
-    data_folder,
-    selected_file
-)
-
-
-# =========================================
+# =========================================================
 # LOAD DATA
-# =========================================
+# =========================================================
 
-try:
+if selected_file:
 
-    # =====================================
-    # LOAD EXCEL FILES
-    # =====================================
+    if network_type == "Upstream":
+        file_path = UPSTREAM_DIR / selected_file
+    else:
+        file_path = DOWNSTREAM_DIR / selected_file
 
-    df_main = pd.read_excel(
-        file_path,
-        sheet_name=0
+    # =====================================================
+    # READ SHEETS
+    # =====================================================
+
+    sheet1 = pd.read_excel(file_path, sheet_name=0)
+    sheet2 = pd.read_excel(file_path, sheet_name=1)
+
+    # =====================================================
+    # BUILD GRAPH
+    # =====================================================
+
+    G = nx.DiGraph()
+
+    # =====================================================
+    # MAIN CHAIN
+    # =====================================================
+
+    for _, row in sheet1.iterrows():
+
+        source = str(row["Source_NodeID"])
+        target = str(row["Target_NodeID"])
+
+        interaction = str(row["Interaction"])
+
+        G.add_node(
+            source,
+            node_type="main_chain"
+        )
+
+        G.add_node(
+            target,
+            node_type="main_chain"
+        )
+
+        G.add_edge(
+            source,
+            target,
+            relation_id=row["RelationID"],
+            interaction=interaction,
+            edge_type="main_chain"
+        )
+
+    # =====================================================
+    # CROSS PATHWAY CONNECTIONS
+    # =====================================================
+
+    for _, row in sheet2.iterrows():
+
+        source = str(row["Chain_Node"])
+        target = str(row["Connected_Node"])
+
+        interaction = str(row["Interaction"])
+
+        G.add_node(
+            target,
+            node_type="cross_pathway"
+        )
+
+        G.add_edge(
+            source,
+            target,
+            relation_id=row["RelationID"],
+            interaction=interaction,
+            edge_type="cross_pathway"
+        )
+
+    # =====================================================
+    # NETWORK STATS
+    # =====================================================
+
+    unique_nodes = len(G.nodes())
+    unique_edges = len(G.edges())
+
+    pathways = (
+        sheet1["Pathway_Name"]
+        .dropna()
+        .unique()
     )
 
-    df_cross = pd.read_excel(
-        file_path,
-        sheet_name=1
-    )
+    # =====================================================
+    # METRICS
+    # =====================================================
 
-    # =====================================
-    # BUILD NODE METADATA
-    # =====================================
+    m1, m2, m3, m4 = st.columns(4)
 
-    metadata = build_node_metadata(
-        df_main,
-        df_cross
-    )
+    with m1:
+        st.metric("Nodes", unique_nodes)
 
-    # =====================================
-    # NODE LIST
-    # =====================================
+    with m2:
+        st.metric("Edges", unique_edges)
 
-    all_nodes = sorted(
-        metadata.keys()
-    )
+    with m3:
+        st.metric("Pathways", len(pathways))
 
-    # =====================================
-    # SIDEBAR NODE SELECTOR
-    # =====================================
+    with m4:
+        st.metric("Cross Links", len(sheet2))
 
-    sidebar_selected_node = st.sidebar.selectbox(
-        "Select Node ID",
-        all_nodes
-    )
+    st.write("")
 
-    # =====================================
-    # INITIAL NODE
-    # =====================================
-
-    if st.session_state[
-        "selected_node"
-    ] is None:
-
-        st.session_state[
-            "selected_node"
-        ] = sidebar_selected_node
-
-    # =====================================
+    # =====================================================
     # MAIN LAYOUT
-    # =====================================
+    # =====================================================
 
-    graph_col, info_col = st.columns(
-        [2.3, 1]
-    )
+    left_col, right_col = st.columns([4.5, 1.5])
 
-    # =====================================
-    # GRAPH PANEL
-    # =====================================
+    # =====================================================
+    # LEFT PANEL
+    # =====================================================
 
-    with graph_col:
+    with left_col:
 
-        st.subheader(
-            "Interactive Biological Network"
+        st.markdown(
+            '<div class="network-box">',
+            unsafe_allow_html=True
         )
 
-        selected_element = render_cytoscape(
-            df_main,
-            df_cross,
-            metadata,
-            include_cross_nodes
+        st.subheader("Biological Pathway Workspace")
+
+        # =================================================
+        # CYTOSCAPE ELEMENTS
+        # =================================================
+
+        nodes = []
+        edges = []
+
+        # =================================================
+        # NODES
+        # =================================================
+
+        for node in G.nodes():
+
+            node_data = G.nodes[node]
+
+            degree = G.degree(node)
+
+            if node_data["node_type"] == "main_chain":
+
+                color = "#4F8EF7"
+                size = 26 + (degree * 1.5)
+                shape = "ellipse"
+
+            else:
+
+                color = "#D6E6FF"
+                size = 16 + (degree * 0.5)
+                shape = "round-rectangle"
+
+            nodes.append({
+                "data": {
+                    "id": node,
+                    "label": node,
+                    "color": color,
+                    "size": size,
+                    "shape": shape,
+                    "degree": degree
+                }
+            })
+
+        # =================================================
+        # EDGES
+        # =================================================
+
+        for source, target, data in G.edges(data=True):
+
+            if data["edge_type"] == "main_chain":
+
+                edge_color = "#4F8EF7"
+                width = 3
+
+            else:
+
+                edge_color = "#BFD8FF"
+                width = 1.3
+
+            edges.append({
+                "data": {
+                    "source": source,
+                    "target": target,
+                    "label": data["relation_id"],
+                    "color": edge_color,
+                    "width": width
+                }
+            })
+
+        # =================================================
+        # CYTOSCAPE DATA
+        # =================================================
+
+        cytoscape_data = {
+            "nodes": nodes,
+            "edges": edges
+        }
+
+        # =================================================
+        # HTML + CYTOSCAPE
+        # =================================================
+
+        html_code = f"""
+        <!DOCTYPE html>
+        <html>
+
+        <head>
+
+        <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+
+        <script src="https://unpkg.com/dagre@0.7.4/dist/dagre.js"></script>
+
+        <script src="https://unpkg.com/cytoscape-dagre/cytoscape-dagre.js"></script>
+
+        <style>
+
+        body {{
+            margin: 0;
+            padding: 0;
+            background: #F8F9FB;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        }}
+
+        #cy {{
+            width: 100%;
+            height: 1100px;
+            background: #F8F9FB;
+            border-radius: 20px;
+        }}
+
+        </style>
+
+        </head>
+
+        <body>
+
+        <div id="cy"></div>
+
+        <script>
+
+        const elements = {json.dumps(cytoscape_data["nodes"] + cytoscape_data["edges"])};
+
+        const cy = cytoscape({{
+
+            container: document.getElementById('cy'),
+
+            elements: elements,
+
+            style: [
+
+                {{
+                    selector: 'node',
+                    style: {{
+                        'background-color': 'data(color)',
+                        'label': 'data(label)',
+                        'width': 'data(size)',
+                        'height': 'data(size)',
+                        'shape': 'data(shape)',
+                        'font-size': '11px',
+                        'font-weight': '500',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'color': '#1D1D1F',
+                        'border-width': 2,
+                        'border-color': '#FFFFFF',
+                        'text-wrap': 'wrap',
+                        'overlay-opacity': 0,
+                        'shadow-blur': 8,
+                        'shadow-opacity': 0.12,
+                        'shadow-color': '#A0A0A0'
+                    }}
+                }},
+
+                {{
+                    selector: 'edge',
+                    style: {{
+                        'width': 'data(width)',
+                        'line-color': 'data(color)',
+                        'target-arrow-color': 'data(color)',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'arrow-scale': 1.1,
+                        'opacity': 0.75,
+                        'label': 'data(label)',
+                        'font-size': '7px',
+                        'text-background-color': '#FFFFFF',
+                        'text-background-opacity': 1,
+                        'text-background-padding': '2px',
+                        'color': '#6E6E73'
+                    }}
+                }}
+
+            ],
+
+            layout: {{
+                name: 'dagre',
+                rankDir: 'LR',
+                spacingFactor: 2.8,
+                nodeSep: 120,
+                edgeSep: 80,
+                rankSep: 180,
+                animate: true,
+                fit: false,
+                padding: 80
+            }}
+
+        }});
+
+        </script>
+
+        </body>
+
+        </html>
+        """
+
+        html(
+            html_code,
+            height=1120
         )
 
-        # =================================
-        # STORE CYTOSCAPE SELECTION
-        # =================================
-
-        if selected_element:
-
-            st.session_state[
-                "selected_element"
-            ] = selected_element
-
-        # =================================
-        # LOAD CURRENT SELECTION
-        # =================================
-
-        selected_element = st.session_state.get(
-            "selected_element",
-            {}
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
         )
 
-        # =================================
-        # AUTO NODE UPDATE
-        # =================================
-
-        try:
-
-            selected_nodes = selected_element.get(
-                "nodes",
-                []
-            )
-
-            if selected_nodes:
-
-                clicked_node = selected_nodes[0].get(
-                    "data",
-                    {}
-                ).get("id")
-
-                if clicked_node:
-
-                    st.session_state[
-                        "selected_node"
-                    ] = clicked_node
-
-        except:
-            pass
-
-        # =================================
-        # DEBUG PANEL
-        # =================================
-
-        with st.expander(
-            "Selection Debug"
-        ):
-
-            st.write(
-                selected_element
-            )
-
-    # =====================================
+    # =====================================================
     # RIGHT PANEL
-    # =====================================
+    # =====================================================
 
-    with info_col:
-
-        st.subheader(
-            "Biological Annotation Explorer"
-        )
-
-        selected_node = st.session_state.get(
-            "selected_node",
-            sidebar_selected_node
-        )
-
-        node_info = metadata.get(
-            selected_node,
-            {}
-        )
-
-        # =================================
-        # NODE INFO
-        # =================================
+    with right_col:
 
         st.markdown(
-            "## Node Information"
+            '<div class="panel-box">',
+            unsafe_allow_html=True
         )
 
-        st.code(selected_node)
+        st.subheader("Pathway Inspector")
+
+        st.write("### Selected Pathway")
+
+        for pathway in pathways:
+            st.write(f"• {pathway}")
+
+        st.write("### Interaction Types")
+
+        interaction_types = (
+            sheet1["Interaction"]
+            .dropna()
+            .unique()
+        )
+
+        for interaction in interaction_types[:15]:
+            st.write(f"• {interaction}")
+
+        st.write("### Network Summary")
 
         st.write(
-            f"Type: {node_info.get('type', '')}"
+            f"""
+            Nodes: {unique_nodes}
+
+            Edges: {unique_edges}
+
+            Cross pathway links: {len(sheet2)}
+            """
         )
 
-        st.write(
-            f"Connections: "
-            f"{node_info.get('connections', '')}"
+        st.write("### Main Chain Preview")
+
+        preview_cols = [
+            "Source_NodeID",
+            "Target_NodeID",
+            "Interaction"
+        ]
+
+        st.dataframe(
+            sheet1[preview_cols],
+            use_container_width=True,
+            height=450
         )
-
-        st.write(
-            f"Cross Pathway: "
-            f"{node_info.get('cross_node', '')}"
-        )
-
-        # =================================
-        # KEGG IDS
-        # =================================
-
-        st.markdown("---")
 
         st.markdown(
-            "## KEGG IDs"
+            "</div>",
+            unsafe_allow_html=True
         )
 
-        for kid in node_info.get(
-            "kegg_ids",
-            []
-        ):
+# =========================================================
+# FOOTER
+# =========================================================
 
-            st.code(kid)
+st.write("")
 
-        # =================================
-        # BIOLOGICAL METADATA
-        # =================================
-
-        st.markdown("---")
-
-        st.markdown(
-            "## Biological Metadata"
-        )
-
-        biological_data = node_info.get(
-            "biological_data",
-            []
-        )
-
-        if biological_data:
-
-            for idx, item in enumerate(
-                biological_data
-            ):
-
-                with st.expander(
-                    f"Metadata {idx + 1}"
-                ):
-
-                    st.write(
-                        "### Names"
-                    )
-
-                    st.write(
-                        item.get(
-                            "Names",
-                            ""
-                        )
-                    )
-
-                    st.write(
-                        "### HSA Symbols"
-                    )
-
-                    st.write(
-                        item.get(
-                            "HSA_Symbols",
-                            ""
-                        )
-                    )
-
-                    st.write(
-                        "### GO IDs"
-                    )
-
-                    st.write(
-                        item.get(
-                            "GO_IDs",
-                            ""
-                        )
-                    )
-
-                    st.write(
-                        "### GO Labels"
-                    )
-
-                    st.write(
-                        item.get(
-                            "GO_Labels",
-                            ""
-                        )
-                    )
-
-                    st.write(
-                        "### UniProt IDs"
-                    )
-
-                    st.write(
-                        item.get(
-                            "UniProt_IDs",
-                            ""
-                        )
-                    )
-
-        # =================================
-        # RELATION EXPLORER
-        # =================================
-
-        st.markdown("---")
-
-        render_relation_explorer(
-            selected_node,
-            df_main,
-            df_cross
-        )
-
-        # =================================
-        # LEGEND
-        # =================================
-
-        st.markdown("---")
-
-        render_legend()
-
-# =========================================
-# ERROR HANDLING
-# =========================================
-
-except Exception as e:
-
-    st.error(
-        "Error loading explorer"
-    )
-
-    st.exception(e)
+st.caption(
+    "BCL2 Network Explorer • Interactive Biological Pathway Visualization"
+)
