@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+import os
 
 
 # =========================================
@@ -8,9 +9,25 @@ import re
 
 def load_metadata():
 
-    metadata_path = (
-        "data/metadata/"
-        "Annotated_Keggid_Metadata.xlsx"
+    metadata_folder = "data/metadata"
+
+    files = os.listdir(metadata_folder)
+
+    excel_files = [
+        f for f in files
+        if f.endswith(".xlsx")
+    ]
+
+    if len(excel_files) == 0:
+
+        raise FileNotFoundError(
+            "No metadata Excel file found "
+            "inside data/metadata/"
+        )
+
+    metadata_path = os.path.join(
+        metadata_folder,
+        excel_files[0]
     )
 
     df = pd.read_excel(metadata_path)
@@ -19,27 +36,66 @@ def load_metadata():
 
     for _, row in df.iterrows():
 
-        kegg_id = str(row["KEGG_ID"]).strip()
+        kegg_id = str(
+            row["KEGG_ID"]
+        ).strip()
 
         metadata_dict[kegg_id] = {
 
-            "Names": row.get("Names", ""),
-            "EC_Number": row.get("EC_Number", ""),
-            "Ortholog_IDs": row.get("Ortholog_IDs", ""),
-            "HSA_IDs": row.get("HSA_IDs", ""),
-            "Compound_IDs": row.get("Compound_IDs", ""),
-            "HSA_Symbols": row.get("HSA_Symbols", ""),
+            "Names": row.get(
+                "Names",
+                ""
+            ),
+
+            "EC_Number": row.get(
+                "EC_Number",
+                ""
+            ),
+
+            "Ortholog_IDs": row.get(
+                "Ortholog_IDs",
+                ""
+            ),
+
+            "HSA_IDs": row.get(
+                "HSA_IDs",
+                ""
+            ),
+
+            "Compound_IDs": row.get(
+                "Compound_IDs",
+                ""
+            ),
+
+            "HSA_Symbols": row.get(
+                "HSA_Symbols",
+                ""
+            ),
+
             "HSA_Biological_Names": row.get(
                 "HSA_Biological_Names",
                 ""
             ),
+
             "Compound_Biological_Names_Symbol": row.get(
                 "Compound_Biological_Names_Symbol",
                 ""
             ),
-            "UniProt_IDs": row.get("UniProt_IDs", ""),
-            "GO_IDs": row.get("GO_IDs", ""),
-            "GO_Labels": row.get("GO_Labels", "")
+
+            "UniProt_IDs": row.get(
+                "UniProt_IDs",
+                ""
+            ),
+
+            "GO_IDs": row.get(
+                "GO_IDs",
+                ""
+            ),
+
+            "GO_Labels": row.get(
+                "GO_Labels",
+                ""
+            )
         }
 
     return metadata_dict
