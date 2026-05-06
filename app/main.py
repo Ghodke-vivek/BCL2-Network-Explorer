@@ -20,6 +20,11 @@ st.set_page_config(
 
 st.title("BCL2 Biological Network Explorer")
 
+st.markdown("""
+Interactive pathway-specific upstream and downstream  
+BCL2 interaction network explorer.
+""")
+
 # =========================================
 # SIDEBAR CONTROLS
 # =========================================
@@ -36,7 +41,7 @@ network_type = st.sidebar.radio(
 )
 
 # =========================================
-# DATA PATH
+# DATA FOLDER
 # =========================================
 
 if network_type == "Upstream":
@@ -72,7 +77,7 @@ include_cross_nodes = st.sidebar.checkbox(
 )
 
 # =========================================
-# FILE PATH
+# FULL FILE PATH
 # =========================================
 
 file_path = os.path.join(
@@ -85,6 +90,10 @@ file_path = os.path.join(
 # =========================================
 
 try:
+
+    # =====================================
+    # READ EXCEL SHEETS
+    # =====================================
 
     df_main = pd.read_excel(
         file_path,
@@ -109,7 +118,9 @@ try:
     # NODE SELECTOR
     # =====================================
 
-    all_nodes = sorted(metadata.keys())
+    all_nodes = sorted(
+        metadata.keys()
+    )
 
     selected_node = st.sidebar.selectbox(
         "Select Node ID",
@@ -121,7 +132,7 @@ try:
     # =====================================
 
     left_col, right_col = st.columns(
-        [2.2, 1]
+        [2.3, 1]
     )
 
     # =====================================
@@ -130,12 +141,15 @@ try:
 
     with left_col:
 
-        st.subheader("Network Visualization")
+        st.subheader(
+            "Interactive Network Visualization"
+        )
 
         html_graph = build_network(
             df_main,
             df_cross,
-            include_cross_nodes
+            include_cross_nodes,
+            selected_node
         )
 
         st.components.v1.html(
@@ -150,7 +164,9 @@ try:
 
     with right_col:
 
-        st.subheader("Biological Annotation Explorer")
+        st.subheader(
+            "Biological Annotation Explorer"
+        )
 
         node_info = metadata[selected_node]
 
@@ -177,22 +193,30 @@ try:
         # =================================
 
         st.markdown("---")
+
         st.markdown("## KEGG IDs")
 
         if node_info["kegg_ids"]:
 
             for kid in node_info["kegg_ids"]:
+
                 st.code(kid)
 
         else:
-            st.info("No KEGG IDs found")
+
+            st.info(
+                "No KEGG IDs found"
+            )
 
         # =================================
         # BIOLOGICAL METADATA
         # =================================
 
         st.markdown("---")
-        st.markdown("## Biological Metadata")
+
+        st.markdown(
+            "## Biological Metadata"
+        )
 
         if node_info["biological_data"]:
 
@@ -205,11 +229,18 @@ try:
                 ):
 
                     st.write("### Names")
+
                     st.write(
-                        item.get("Names", "")
+                        item.get(
+                            "Names",
+                            ""
+                        )
                     )
 
-                    st.write("### HSA Symbols")
+                    st.write(
+                        "### HSA Symbols"
+                    )
+
                     st.write(
                         item.get(
                             "HSA_Symbols",
@@ -220,6 +251,7 @@ try:
                     st.write(
                         "### HSA Biological Names"
                     )
+
                     st.write(
                         item.get(
                             "HSA_Biological_Names",
@@ -227,7 +259,10 @@ try:
                         )
                     )
 
-                    st.write("### UniProt IDs")
+                    st.write(
+                        "### UniProt IDs"
+                    )
+
                     st.write(
                         item.get(
                             "UniProt_IDs",
@@ -235,7 +270,10 @@ try:
                         )
                     )
 
-                    st.write("### GO IDs")
+                    st.write(
+                        "### GO IDs"
+                    )
+
                     st.write(
                         item.get(
                             "GO_IDs",
@@ -243,7 +281,10 @@ try:
                         )
                     )
 
-                    st.write("### GO Labels")
+                    st.write(
+                        "### GO Labels"
+                    )
+
                     st.write(
                         item.get(
                             "GO_Labels",
@@ -251,7 +292,10 @@ try:
                         )
                     )
 
-                    st.write("### EC Number")
+                    st.write(
+                        "### EC Number"
+                    )
+
                     st.write(
                         item.get(
                             "EC_Number",
@@ -270,7 +314,14 @@ try:
         # =================================
 
         st.markdown("---")
-        st.markdown("## Relation Explorer")
+
+        st.markdown(
+            "## Relation Explorer"
+        )
+
+        # =================================
+        # MAIN RELATIONS
+        # =================================
 
         related_main = df_main[
             (
@@ -284,6 +335,10 @@ try:
             )
         ]
 
+        # =================================
+        # CROSS RELATIONS
+        # =================================
+
         related_cross = df_cross[
             (
                 df_cross["Chain_Node"]
@@ -295,6 +350,10 @@ try:
                 == selected_node
             )
         ]
+
+        # =================================
+        # MAIN CHAIN RELATIONS
+        # =================================
 
         st.write(
             "### Main Chain Relations"
@@ -312,6 +371,10 @@ try:
             st.info(
                 "No main chain relations"
             )
+
+        # =================================
+        # CROSS PATHWAY RELATIONS
+        # =================================
 
         st.write(
             "### Cross Pathway Relations"
