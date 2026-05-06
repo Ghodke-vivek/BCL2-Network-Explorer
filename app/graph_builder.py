@@ -7,9 +7,7 @@ from node_metadata import build_node_metadata
 from styles import (
     GENE_COLOR,
     PROTEIN_COLOR,
-    COMPOUND_COLOR,
     CROSS_NODE_COLOR,
-    DEFAULT_NODE_COLOR,
     ACTIVATION_COLOR,
     INHIBITION_COLOR,
     EXPRESSION_COLOR,
@@ -18,7 +16,7 @@ from styles import (
 
 
 # =========================================
-# EDGE COLOR LOGIC
+# EDGE COLORS
 # =========================================
 
 def get_edge_color(interaction):
@@ -39,18 +37,55 @@ def get_edge_color(interaction):
 
 
 # =========================================
-# NODE COLOR LOGIC
+# NODE COLORS
 # =========================================
 
-def get_node_color(node_info):
+def get_node_color(info):
 
-    if node_info["cross_node"]:
+    if info["cross_node"]:
         return CROSS_NODE_COLOR
 
-    if node_info["type"] == "Gene":
+    if info["type"] == "Gene":
         return GENE_COLOR
 
     return PROTEIN_COLOR
+
+
+# =========================================
+# TOOLTIP GENERATION
+# =========================================
+
+def generate_tooltip(node, info):
+
+    tooltip = f"""
+    <h3>{node}</h3>
+
+    <b>Type:</b> {info['type']}<br>
+    <b>Connections:</b> {info['connections']}<br>
+    <b>Cross Pathway:</b> {info['cross_node']}<br><br>
+    """
+
+    for item in info["biological_data"][:3]:
+
+        tooltip += f"""
+        <hr>
+
+        <b>Names:</b> {item.get('Names', '')}<br>
+
+        <b>HSA Symbols:</b>
+        {item.get('HSA_Symbols', '')}<br>
+
+        <b>UniProt IDs:</b>
+        {item.get('UniProt_IDs', '')}<br>
+
+        <b>GO IDs:</b>
+        {item.get('GO_IDs', '')}<br>
+
+        <b>GO Labels:</b>
+        {item.get('GO_Labels', '')}<br>
+        """
+
+    return tooltip
 
 
 # =========================================
@@ -61,17 +96,13 @@ def build_network(df_main, df_cross, include_cross_nodes):
 
     G = nx.DiGraph()
 
-    # =====================================
-    # BUILD NODE METADATA
-    # =====================================
-
     metadata = build_node_metadata(
         df_main,
         df_cross
     )
 
     # =====================================
-    # MAIN CHAIN RELATIONS
+    # MAIN CHAIN
     # =====================================
 
     for _, row in df_main.iterrows():
@@ -85,11 +116,12 @@ def build_network(df_main, df_cross, include_cross_nodes):
             source,
             target,
             color=get_edge_color(interaction),
-            title=interaction
+            title=interaction,
+            width=3
         )
 
     # =====================================
-    # CROSS PATHWAY RELATIONS
+    # CROSS NODES
     # =====================================
 
     if include_cross_nodes:
@@ -99,37 +131,24 @@ def build_network(df_main, df_cross, include_cross_nodes):
             source = str(row["Chain_Node"])
             target = str(row["Connected_Node"])
 
-            pathway = str(row["Connected_Pathway"])
-
             G.add_edge(
                 source,
                 target,
-                color="gray",
-                title=f"Cross Pathway: {pathway}"
+                color="#777777",
+                title="Cross Pathway Connection",
+                width=1
             )
 
     # =====================================
-    # CREATE PYVIS NETWORK
+    # PYVIS NETWORK
     # =====================================
 
     net = Network(
-        height="850px",
+        height="900px",
         width="100%",
         directed=True,
         bgcolor="#111111",
         font_color="white"
-    )
-
-    # =====================================
-    # PHYSICS SETTINGS
-    # =====================================
-
-    net.barnes_hut(
-        gravity=-5000,
-        central_gravity=0.2,
-        spring_length=180,
-        spring_strength=0.03,
-        damping=0.09
     )
 
     # =====================================
@@ -138,53 +157,31 @@ def build_network(df_main, df_cross, include_cross_nodes):
 
     for node in G.nodes():
 
-        node_info = metadata.get(
+        info = metadata.get(
             node,
             {
-                "type": "Unknown",
+                "type": "Protein",
                 "cross_node": False,
-                "connections": 1
+                "connections": 1,
+                "biological_data": []
             }
         )
 
-        degree = node_info["connections"]
+        degree = info["connections"]
 
-        node_type = node_info["type"]
+        label = f"{node}"
 
-        is_cross = node_info["cross_node"]
-
-        # =================================
-        # NODE LABEL
-        # =================================
-
-        label = f"{node} ({degree})"
-
-        # =================================
-        # NODE SIZE
-        # =================================
-
-        size = 15 + (degree * 2)
-
-        # =================================
-        # TOOLTIP
-        # =================================
-
-        tooltip = f"""
-        <b>Node ID:</b> {node}<br>
-        <b>Type:</b> {node_type}<br>
-        <b>Connections:</b> {degree}<br>
-        <b>Cross Pathway Node:</b> {is_cross}
-        """
-
-        # =================================
-        # NODE ADDITION
-        # =================================
+        # Smaller for cross nodes
+        if info["cross_node"]:
+            size = 10
+        else:
+            size = 18 + (degree * 2)
 
         net.add_node(
             node,
             label=label,
-            title=tooltip,
-            color=get_node_color(node_info),
+            title=generate_tooltip(node, info),
+            color=get_node_color(info),
             size=size,
             borderWidth=2
         )
@@ -200,26 +197,28 @@ def build_network(df_main, df_cross, include_cross_nodes):
             target,
             color=data["color"],
             title=data["title"],
+            width=data["width"],
             arrows="to"
         )
 
     # =====================================
-    # INTERACTION OPTIONS
+    # PHYSICS
+    # =====================================
+
+    net.barnes_hut(
+        gravity=-3000,
+        central_gravity=0.2,
+        spring_length=140,
+        spring_strength=0.03,
+        damping=0.09
+    )
+
+    # =====================================
+    # OPTIONS
     # =====================================
 
     net.set_options("""
     {
-      "nodes": {
-        "shape": "dot",
-        "font": {
-          "size": 14
-        }
-      },
-      "edges": {
-        "smooth": {
-          "type": "dynamic"
-        }
-      },
       "interaction": {
         "hover": true,
         "navigationButtons": true,
@@ -232,7 +231,7 @@ def build_network(df_main, df_cross, include_cross_nodes):
     """)
 
     # =====================================
-    # SAVE TEMP HTML
+    # SAVE
     # =====================================
 
     temp_file = tempfile.NamedTemporaryFile(
