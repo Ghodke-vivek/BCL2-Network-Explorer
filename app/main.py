@@ -93,8 +93,8 @@ st.markdown(
 # DATA PATHS
 # =========================================================
 
-UPSTREAM_DIR = Path("data/raw/upstream")
-DOWNSTREAM_DIR = Path("data/raw/downstream")
+UPSTREAM_DIR = Path("data/upstream")
+DOWNSTREAM_DIR = Path("data/downstream")
 
 # =========================================================
 # SIDEBAR
