@@ -4,7 +4,12 @@ import networkx as nx
 from pathlib import Path
 import json
 
-from streamlit_cytoscapejs import st_cytoscapejs
+from streamlit_agraph import (
+    agraph,
+    Node,
+    Edge,
+    Config
+)
 
 # =========================================================
 # PAGE CONFIG
@@ -56,7 +61,7 @@ st.markdown(
     }
 
     .network-box {
-        background-color: #FCFCFD;
+        background-color: #FFFFFF;
         border-radius: 24px;
         padding: 18px;
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
@@ -67,26 +72,8 @@ st.markdown(
         border-radius: 24px;
         padding: 20px;
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
-        min-height: 920px;
+        min-height: 900px;
         overflow-y: auto;
-    }
-
-    div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        color: #1D1D1F !important;
-    }
-
-    div[data-baseweb="popover"] {
-        background-color: #FFFFFF !important;
-    }
-
-    div[role="listbox"] {
-        background-color: #FFFFFF !important;
-    }
-
-    div[role="option"] {
-        background-color: #FFFFFF !important;
-        color: #1D1D1F !important;
     }
 
     </style>
@@ -173,7 +160,7 @@ if selected_file:
         file_path = DOWNSTREAM_DIR / selected_file
 
     # =====================================================
-    # READ DATA
+    # READ EXCEL
     # =====================================================
 
     sheet1 = pd.read_excel(file_path, sheet_name=0)
@@ -197,9 +184,9 @@ if selected_file:
         source = str(row["Source_NodeID"])
         target = str(row["Target_NodeID"])
 
-        interaction = str(row["Interaction"])
-
         relation_id = str(row["RelationID"])
+
+        interaction = str(row["Interaction"])
 
         source_kegg = str(row["Source"])
         target_kegg = str(row["Target"])
@@ -307,14 +294,10 @@ if selected_file:
         st.metric("Cross Links", len(sheet2))
 
     # =====================================================
-    # ELEMENTS
+    # BUILD AGRAPH NODES
     # =====================================================
 
-    elements = []
-
-    # =====================================================
-    # NODES
-    # =====================================================
+    nodes = []
 
     for node in G.nodes():
 
@@ -325,94 +308,71 @@ if selected_file:
         if node_type == "main_chain":
 
             color = "#4F8EF7"
-            size = 22 + (degree * 1.2)
-            shape = "ellipse"
+            size = 28 + (degree * 1.5)
 
         else:
 
             color = "#D6E6FF"
-            size = 15 + (degree * 0.5)
-            shape = "round-rectangle"
+            size = 18 + (degree * 0.7)
 
-        elements.append({
-            "data": {
-                "id": node,
-                "label": node,
-                "degree": degree,
-                "color": color,
-                "size": size,
-                "shape": shape
-            }
-        })
+        nodes.append(
+
+            Node(
+                id=node,
+                label=node,
+                size=size,
+                color=color
+            )
+
+        )
 
     # =====================================================
-    # EDGES
+    # BUILD AGRAPH EDGES
     # =====================================================
+
+    edges = []
 
     for source, target, data in G.edges(data=True):
 
         if data["edge_type"] == "main_chain":
 
-            edge_color = "#4F8EF7"
-            width = 2.5
+            color = "#4F8EF7"
 
         else:
 
-            edge_color = "#C8DBFF"
-            width = 1
+            color = "#C8DBFF"
 
-        elements.append({
-            "data": {
-                "id": data["relation_id"],
-                "source": source,
-                "target": target,
-                "label": data["relation_id"],
-                "color": edge_color,
-                "width": width
-            }
-        })
+        edges.append(
 
-    # =====================================================
-    # STYLESHEET
-    # =====================================================
+            Edge(
+                source=source,
+                target=target,
+                label=data["relation_id"],
+                color=color
+            )
 
-    stylesheet = [
-
-        {
-            "selector": "node",
-            "style": {
-                "label": "data(label)",
-                "text-valign": "center",
-                "text-halign": "center",
-                "font-size": 10,
-                "color": "#1D1D1F",
-                "border-width": 2,
-                "border-color": "#FFFFFF",
-                "background-color": "data(color)",
-                "width": "data(size)",
-                "height": "data(size)",
-                "shape": "data(shape)"
-            }
-        },
-
-        {
-            "selector": "edge",
-            "style": {
-                "curve-style": "bezier",
-                "target-arrow-shape": "triangle",
-                "line-color": "data(color)",
-                "target-arrow-color": "data(color)",
-                "width": "data(width)"
-            }
-        }
-
-    ]
+        )
 
     # =====================================================
-    # LAYOUT
+    # GRAPH CONFIG
     # =====================================================
 
-    graph_col, inspector_col = st.columns([5, 1.7])
+    config = Config(
+        width="100%",
+        height=850,
+        directed=True,
+        physics=True,
+        hierarchical=False,
+        nodeHighlightBehavior=True,
+        highlightColor="#F7A7A6",
+        collapsible=False
+    )
+
+    # =====================================================
+    # MAIN LAYOUT
+    # =====================================================
+
+    graph_col, inspector_col = st.columns([5, 1.8])
 
     # =====================================================
     # GRAPH
@@ -427,9 +387,10 @@ if selected_file:
 
         st.subheader("Biological Pathway Workspace")
 
-        selected = st_cytoscapejs(
-            elements,
-            stylesheet
+        selected_node = agraph(
+            nodes=nodes,
+            edges=edges,
+            config=config
         )
 
         st.markdown(
@@ -450,17 +411,9 @@ if selected_file:
 
         st.subheader("Pathway Inspector")
 
-        if selected:
+        if selected_node:
 
-            selected_id = None
-
-            if isinstance(selected, dict):
-
-                selected_id = selected.get("id")
-
-            # =================================================
-            # NODE
-            # =================================================
+            selected_id = selected_node
 
             if selected_id in node_metadata:
 
@@ -474,32 +427,16 @@ if selected_file:
                     language="json"
                 )
 
-            # =================================================
-            # EDGE
-            # =================================================
-
-            elif selected_id in edge_metadata:
-
-                st.success("Edge Selected")
-
-                st.code(
-                    json.dumps(
-                        edge_metadata[selected_id],
-                        indent=2
-                    ),
-                    language="json"
-                )
-
             else:
 
                 st.info(
-                    "Click a node or edge to inspect metadata."
+                    "Edge selection metadata currently unavailable in streamlit-agraph."
                 )
 
         else:
 
             st.info(
-                "Click a node or edge to inspect metadata."
+                "Click a node to inspect metadata."
             )
 
         st.markdown(
