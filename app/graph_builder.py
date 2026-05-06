@@ -5,9 +5,6 @@ import tempfile
 from node_metadata import build_node_metadata
 
 from styles import (
-    GENE_COLOR,
-    PROTEIN_COLOR,
-    CROSS_NODE_COLOR,
     ACTIVATION_COLOR,
     INHIBITION_COLOR,
     EXPRESSION_COLOR,
@@ -37,24 +34,6 @@ def get_edge_color(interaction):
 
 
 # =========================================
-# NODE COLOR
-# =========================================
-
-def get_node_color(info):
-
-    # Cross pathway nodes
-    if info["cross_node"]:
-        return "#AA88FF"
-
-    # Gene nodes
-    if info["type"] == "Gene":
-        return "#00FFAA"
-
-    # Default proteins/general nodes
-    return "#3FA7FF"
-
-
-# =========================================
 # DISPLAY LABEL
 # =========================================
 
@@ -65,7 +44,6 @@ def get_display_label(node, info):
         []
     )
 
-    # Use HSA symbol if available
     for item in biological_data:
 
         symbol = str(
@@ -74,12 +52,10 @@ def get_display_label(node, info):
 
         if symbol and symbol != "nan":
 
-            # Multiple symbols handling
             symbol = symbol.split("|")[0]
 
             return symbol
 
-    # Fallback
     return node
 
 
@@ -144,8 +120,10 @@ def build_network(
     )
 
     # =====================================
-    # MAIN CHAIN EDGES
+    # BUILD MAIN CHAIN ONLY
     # =====================================
+
+    main_chain_nodes = set()
 
     for _, row in df_main.iterrows():
 
@@ -154,31 +132,45 @@ def build_network(
 
         interaction = str(row["Interaction"])
 
+        main_chain_nodes.add(source)
+        main_chain_nodes.add(target)
+
         G.add_edge(
             source,
             target,
             interaction=interaction,
             color=get_edge_color(interaction),
-            width=4
+            width=5,
+            contextual=False
         )
 
     # =====================================
-    # CROSS PATHWAY EDGES
+    # ADD CONTEXTUAL CROSS NODES
     # =====================================
 
     if include_cross_nodes:
 
         for _, row in df_cross.iterrows():
 
-            source = str(row["Chain_Node"])
-            target = str(row["Connected_Node"])
+            chain_node = str(
+                row["Chain_Node"]
+            )
+
+            connected_node = str(
+                row["Connected_Node"]
+            )
+
+            # ONLY connect to chain node
+            # NO recursive expansion
+            # NO secondary edges
 
             G.add_edge(
-                source,
-                target,
+                chain_node,
+                connected_node,
                 interaction="Cross Pathway",
-                color="#777777",
-                width=1
+                color="#888888",
+                width=1,
+                contextual=True
             )
 
     # =====================================
@@ -194,15 +186,15 @@ def build_network(
     )
 
     # =====================================
-    # PHYSICS
+    # BETTER PHYSICS
     # =====================================
 
     net.barnes_hut(
-        gravity=-2500,
-        central_gravity=0.15,
-        spring_length=180,
-        spring_strength=0.02,
-        damping=0.12
+        gravity=-1800,
+        central_gravity=0.25,
+        spring_length=160,
+        spring_strength=0.015,
+        damping=0.15
     )
 
     # =====================================
@@ -228,52 +220,69 @@ def build_network(
 
         degree = info["connections"]
 
+        is_cross = info["cross_node"]
+
         # =================================
-        # NODE SIZE
+        # MAIN CHAIN NODES
         # =================================
 
-        if info["cross_node"]:
-            size = 10
+        if node in main_chain_nodes:
+
+            size = 28 + (degree * 2)
+
+            color = "#3FA7FF"
+
+            shape = "dot"
+
+            opacity = 1.0
+
+            border_width = 3
+
+            border_color = "#FFFFFF"
+
+            # Gene nodes
+            if info["type"] == "Gene":
+
+                color = "#00FFAA"
+
+                shape = "star"
+
+            # Hub nodes
+            if degree >= 6:
+
+                border_width = 6
+
+                border_color = "#FFAA00"
+
+        # =================================
+        # CONTEXTUAL CROSS NODES
+        # =================================
+
         else:
-            size = 20 + (degree * 2)
+
+            size = 12
+
+            color = "#AA88FF"
+
+            shape = "dot"
+
+            opacity = 0.45
+
+            border_width = 1
+
+            border_color = "#BBBBBB"
 
         # =================================
-        # HUB DETECTION
-        # =================================
-
-        border_width = 2
-        border_color = "#FFFFFF"
-
-        if degree >= 8:
-            border_width = 5
-            border_color = "#FFAA00"
-
-        # =================================
-        # SELECTED NODE HIGHLIGHT
+        # SELECTED NODE
         # =================================
 
         if selected_node == node:
-            size += 12
+
+            size += 10
+
             border_width = 8
+
             border_color = "#FFFF00"
-
-        # =================================
-        # NODE SHAPE
-        # =================================
-
-        shape = "dot"
-
-        if info["type"] == "Gene":
-            shape = "star"
-
-        # =================================
-        # NODE OPACITY
-        # =================================
-
-        opacity = 1.0
-
-        if info["cross_node"]:
-            opacity = 0.55
 
         # =================================
         # ADD NODE
@@ -290,7 +299,7 @@ def build_network(
             ),
 
             color={
-                "background": get_node_color(info),
+                "background": color,
                 "border": border_color
             },
 
@@ -300,13 +309,13 @@ def build_network(
 
             borderWidth=border_width,
 
+            opacity=opacity,
+
             font={
                 "size": 18,
                 "face": "arial",
                 "color": "white"
-            },
-
-            opacity=opacity
+            }
         )
 
     # =====================================
@@ -315,12 +324,17 @@ def build_network(
 
     for source, target, data in G.edges(data=True):
 
-        interaction = data["interaction"]
+        contextual = data["contextual"]
 
         dashes = False
 
-        if interaction == "Cross Pathway":
+        smooth_type = "dynamic"
+
+        if contextual:
+
             dashes = True
+
+            smooth_type = "curvedCW"
 
         net.add_edge(
             source,
@@ -330,19 +344,20 @@ def build_network(
 
             width=data["width"],
 
-            title=interaction,
+            title=data["interaction"],
 
             arrows="to",
 
-            smooth={
-                "type": "dynamic"
-            },
+            dashes=dashes,
 
-            dashes=dashes
+            smooth={
+                "enabled": True,
+                "type": smooth_type
+            }
         )
 
     # =====================================
-    # ADVANCED OPTIONS
+    # OPTIONS
     # =====================================
 
     net.set_options("""
@@ -351,13 +366,11 @@ def build_network(
 
         "hover": true,
 
-        "tooltipDelay": 200,
+        "tooltipDelay": 150,
 
         "navigationButtons": true,
 
-        "keyboard": true,
-
-        "multiselect": true
+        "keyboard": true
       },
 
       "physics": {
@@ -376,9 +389,7 @@ def build_network(
 
         "smooth": {
 
-          "enabled": true,
-
-          "type": "dynamic"
+          "enabled": true
         }
       },
 
@@ -390,7 +401,7 @@ def build_network(
     """)
 
     # =====================================
-    # SAVE GRAPH
+    # SAVE
     # =====================================
 
     temp_file = tempfile.NamedTemporaryFile(
