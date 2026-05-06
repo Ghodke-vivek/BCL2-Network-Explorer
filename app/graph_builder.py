@@ -34,46 +34,14 @@ def get_edge_color(interaction):
 
 
 # =========================================
-# DISPLAY LABEL
-# =========================================
-
-def get_display_label(node, info):
-
-    biological_data = info.get(
-        "biological_data",
-        []
-    )
-
-    for item in biological_data:
-
-        symbol = str(
-            item.get("HSA_Symbols", "")
-        ).strip()
-
-        if symbol and symbol != "nan":
-
-            symbol = symbol.split("|")[0]
-
-            return symbol
-
-    return node
-
-
-# =========================================
 # TOOLTIP
 # =========================================
 
 def generate_tooltip(node, info):
 
-    label = get_display_label(
-        node,
-        info
-    )
-
     tooltip = f"""
-    <h3>{label}</h3>
+    <h3>{node}</h3>
 
-    <b>Node ID:</b> {node}<br>
     <b>Type:</b> {info['type']}<br>
     <b>Connections:</b> {info['connections']}<br>
     <b>Cross Pathway:</b> {info['cross_node']}<br>
@@ -213,11 +181,6 @@ def build_network(
             }
         )
 
-        label = get_display_label(
-            node,
-            info
-        )
-
         degree = info["connections"]
 
         is_cross = info["cross_node"]
@@ -291,7 +254,7 @@ def build_network(
         net.add_node(
             node,
 
-            label=label,
+            label=node,
 
             title=generate_tooltip(
                 node,
