@@ -417,7 +417,7 @@ if selected_file:
     graph_col, inspector_col = st.columns([5, 1.8])
 
     # =====================================================
-    # GRAPH
+    # GRAPH PANEL
     # =====================================================
 
     with graph_col:
@@ -435,13 +435,56 @@ if selected_file:
             config=config
         )
 
-        st.markdown("### Edge Inspector")
+        st.markdown("---")
 
-        edge_ids = sorted(list(edge_metadata.keys()))
+        st.markdown("## Edge Inspector")
+
+        search_relation = st.text_input(
+            "Search Relation ID"
+        )
+
+        interaction_filter = st.multiselect(
+            "Filter Interaction Types",
+            sorted(
+                list(
+                    set(
+                        [
+                            edge_metadata[e]["Interaction"]
+                            for e in edge_metadata
+                            if "Interaction" in edge_metadata[e]
+                        ]
+                    )
+                )
+            )
+        )
+
+        filtered_edges = []
+
+        for edge_id, edge_info in edge_metadata.items():
+
+            include_edge = True
+
+            if search_relation:
+
+                if search_relation.lower() not in edge_id.lower():
+                    include_edge = False
+
+            if interaction_filter:
+
+                interaction_value = edge_info.get(
+                    "Interaction",
+                    ""
+                )
+
+                if interaction_value not in interaction_filter:
+                    include_edge = False
+
+            if include_edge:
+                filtered_edges.append(edge_id)
 
         selected_edge = st.selectbox(
-            "Select Relation ID",
-            edge_ids,
+            "Select Edge Relation",
+            filtered_edges,
             key="edge_selector"
         )
 
@@ -451,7 +494,7 @@ if selected_file:
         )
 
     # =====================================================
-    # INSPECTOR
+    # INSPECTOR PANEL
     # =====================================================
 
     with inspector_col:
@@ -511,7 +554,9 @@ if selected_file:
 
             if edge_info:
 
-                st.success(f"Edge Selected: {selected_edge}")
+                st.success(
+                    f"Edge Selected: {edge_info['Relation ID']}"
+                )
 
                 st.code(
                     json.dumps(
