@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import networkx as nx
 from pathlib import Path
-from streamlit.components.v1 import html
 import json
+
+from streamlit_cytoscapejs import st_cytoscapejs
 
 # =========================================================
 # PAGE CONFIG
@@ -66,26 +67,8 @@ st.markdown(
         border-radius: 24px;
         padding: 20px;
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
-        height: 980px;
+        height: 950px;
         overflow-y: auto;
-    }
-
-    div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        color: #1D1D1F !important;
-    }
-
-    div[data-baseweb="popover"] {
-        background-color: #FFFFFF !important;
-    }
-
-    div[role="listbox"] {
-        background-color: #FFFFFF !important;
-    }
-
-    div[role="option"] {
-        background-color: #FFFFFF !important;
-        color: #1D1D1F !important;
     }
 
     </style>
@@ -106,7 +89,7 @@ st.markdown(
 )
 
 # =========================================================
-# DATA PATHS
+# PATHS
 # =========================================================
 
 UPSTREAM_DIR = Path("data/upstream")
@@ -145,7 +128,7 @@ show_cross_pathway = st.sidebar.toggle(
 )
 
 # =========================================================
-# LOAD FILES
+# FILES
 # =========================================================
 
 if network_type == "Upstream":
@@ -172,7 +155,7 @@ if selected_file:
         file_path = DOWNSTREAM_DIR / selected_file
 
     # =====================================================
-    # READ EXCEL
+    # READ DATA
     # =====================================================
 
     sheet1 = pd.read_excel(file_path, sheet_name=0)
@@ -196,15 +179,17 @@ if selected_file:
         source = str(row["Source_NodeID"])
         target = str(row["Target_NodeID"])
 
+        interaction = str(row["Interaction"])
+
+        relation_id = str(row["RelationID"])
+
         source_kegg = str(row["Source"])
         target_kegg = str(row["Target"])
 
-        interaction = str(row["Interaction"])
-
-        node_type = "protein"
+        node_classification = "protein"
 
         if "GErel" in interaction:
-            node_type = "gene"
+            node_classification = "gene"
 
         G.add_node(
             source,
@@ -215,24 +200,6 @@ if selected_file:
             target,
             node_type="main_chain"
         )
-
-        node_metadata[source] = {
-            "Node ID": source,
-            "KEGG IDs": source_kegg,
-            "GO IDs": row.get("Source_GO_IDs", ""),
-            "GO Labels": row.get("Source_GO_Labels", ""),
-            "Classification": node_type
-        }
-
-        node_metadata[target] = {
-            "Node ID": target,
-            "KEGG IDs": target_kegg,
-            "GO IDs": row.get("Target_GO_IDs", ""),
-            "GO Labels": row.get("Target_GO_Labels", ""),
-            "Classification": node_type
-        }
-
-        relation_id = str(row["RelationID"])
 
         G.add_edge(
             source,
@@ -241,6 +208,24 @@ if selected_file:
             interaction=interaction,
             edge_type="main_chain"
         )
+
+        node_metadata[source] = {
+            "Node ID": source,
+            "KEGG IDs": source_kegg,
+            "GO IDs": row.get("Source_GO_IDs", ""),
+            "GO Labels": row.get("Source_GO_Labels", ""),
+            "Classification": node_classification,
+            "Degree": G.degree(source)
+        }
+
+        node_metadata[target] = {
+            "Node ID": target,
+            "KEGG IDs": target_kegg,
+            "GO IDs": row.get("Target_GO_IDs", ""),
+            "GO Labels": row.get("Target_GO_Labels", ""),
+            "Classification": node_classification,
+            "Degree": G.degree(target)
+        }
 
         edge_metadata[relation_id] = {
             "Relation ID": relation_id,
@@ -286,23 +271,16 @@ if selected_file:
             }
 
     # =====================================================
-    # STATS
-    # =====================================================
-
-    node_count = len(G.nodes())
-    edge_count = len(G.edges())
-
-    # =====================================================
     # METRICS
     # =====================================================
 
     m1, m2, m3, m4 = st.columns(4)
 
     with m1:
-        st.metric("Nodes", node_count)
+        st.metric("Nodes", len(G.nodes()))
 
     with m2:
-        st.metric("Edges", edge_count)
+        st.metric("Edges", len(G.edges()))
 
     with m3:
         st.metric("Main Chain", len(sheet1))
@@ -311,13 +289,84 @@ if selected_file:
         st.metric("Cross Links", len(sheet2))
 
     # =====================================================
-    # MAIN LAYOUT
+    # CYTOSCAPE ELEMENTS
     # =====================================================
 
-    graph_col, inspector_col = st.columns([5, 1.6])
+    elements = []
+
+    for node in G.nodes():
+
+        degree = G.degree(node)
+
+        node_type = G.nodes[node]["node_type"]
+
+        if node_type == "main_chain":
+
+            color = "#4F8EF7"
+            size = 22 + (degree * 1.2)
+            shape = "ellipse"
+
+        else:
+
+            color = "#D6E6FF"
+            size = 15 + (degree * 0.5)
+            shape = "round-rectangle"
+
+        elements.append({
+            "data": {
+                "id": node,
+                "label": node,
+                "degree": degree
+            },
+            "style": {
+                "background-color": color,
+                "width": size,
+                "height": size,
+                "shape": shape,
+                "label": node,
+                "font-size": "10px",
+                "color": "#1D1D1F",
+                "text-valign": "center",
+                "text-halign": "center"
+            }
+        })
+
+    for source, target, data in G.edges(data=True):
+
+        if data["edge_type"] == "main_chain":
+
+            edge_color = "#4F8EF7"
+            width = 2.5
+
+        else:
+
+            edge_color = "#C8DBFF"
+            width = 1
+
+        elements.append({
+            "data": {
+                "id": data["relation_id"],
+                "source": source,
+                "target": target,
+                "label": data["relation_id"]
+            },
+            "style": {
+                "line-color": edge_color,
+                "target-arrow-color": edge_color,
+                "target-arrow-shape": "triangle",
+                "curve-style": "bezier",
+                "width": width
+            }
+        })
 
     # =====================================================
-    # GRAPH PANEL
+    # LAYOUT
+    # =====================================================
+
+    graph_col, inspector_col = st.columns([5, 1.7])
+
+    # =====================================================
+    # GRAPH
     # =====================================================
 
     with graph_col:
@@ -329,170 +378,19 @@ if selected_file:
 
         st.subheader("Biological Pathway Workspace")
 
-        nodes = []
-        edges = []
-
-        # =================================================
-        # NODES
-        # =================================================
-
-        for node in G.nodes():
-
-            degree = G.degree(node)
-
-            node_type = G.nodes[node]["node_type"]
-
-            if node_type == "main_chain":
-
-                color = "#4F8EF7"
-                size = 22 + (degree * 1.2)
-                shape = "ellipse"
-
-            else:
-
-                color = "#D6E6FF"
-                size = 15 + (degree * 0.5)
-                shape = "round-rectangle"
-
-            nodes.append({
-                "data": {
-                    "id": node,
-                    "label": node,
-                    "color": color,
-                    "size": size,
-                    "shape": shape
-                }
-            })
-
-        # =================================================
-        # EDGES
-        # =================================================
-
-        for source, target, data in G.edges(data=True):
-
-            if data["edge_type"] == "main_chain":
-
-                edge_color = "#4F8EF7"
-                width = 2.5
-
-            else:
-
-                edge_color = "#C8DBFF"
-                width = 1
-
-            edges.append({
-                "data": {
-                    "id": data["relation_id"],
-                    "source": source,
-                    "target": target,
-                    "label": data["relation_id"],
-                    "color": edge_color,
-                    "width": width
-                }
-            })
-
-        elements = nodes + edges
-
-        # =================================================
-        # CYTOSCAPE HTML
-        # =================================================
-
-        html_code = f"""
-        <!DOCTYPE html>
-        <html>
-
-        <head>
-
-        <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
-
-        <style>
-
-        body {{
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: #F8F9FB;
-        }}
-
-        #cy {{
-            width: 100%;
-            height: 920px;
-            background: #F8F9FB;
-            border-radius: 20px;
-        }}
-
-        </style>
-
-        </head>
-
-        <body>
-
-        <div id="cy"></div>
-
-        <script>
-
-        const cy = cytoscape({{
-
-            container: document.getElementById('cy'),
-
-            elements: {json.dumps(elements)},
-
-            style: [
-
-                {{
-                    selector: 'node',
-                    style: {{
-                        'background-color': 'data(color)',
-                        'label': 'data(label)',
-                        'width': 'data(size)',
-                        'height': 'data(size)',
-                        'shape': 'data(shape)',
-                        'font-size': '10px',
-                        'text-valign': 'center',
-                        'text-halign': 'center',
-                        'color': '#1D1D1F',
-                        'border-width': 2,
-                        'border-color': '#FFFFFF'
-                    }}
-                }},
-
-                {{
-                    selector: 'edge',
-                    style: {{
-                        'width': 'data(width)',
-                        'line-color': 'data(color)',
-                        'target-arrow-color': 'data(color)',
-                        'target-arrow-shape': 'triangle',
-                        'curve-style': 'bezier',
-                        'opacity': 0.75
-                    }}
-                }}
-
-            ],
-
-            layout: {{
-                name: 'cose',
-                animate: true,
-                fit: true,
-                padding: 60,
-                nodeRepulsion: 800000,
-                idealEdgeLength: 130,
-                edgeElasticity: 100,
-                gravity: 0.25
-            }}
-
-        }});
-
-        </script>
-
-        </body>
-
-        </html>
-        """
-
-        html(
-            html_code,
-            height=950
+        selected = st_cytoscapejs(
+            elements=elements,
+            stylesheet=[],
+            layout={
+                "name": "cose",
+                "animate": True,
+                "padding": 60,
+                "nodeRepulsion": 800000,
+                "idealEdgeLength": 130,
+                "gravity": 0.25
+            },
+            height="920px",
+            key="cytoscape"
         )
 
         st.markdown(
@@ -501,7 +399,7 @@ if selected_file:
         )
 
     # =====================================================
-    # INSPECTOR PANEL
+    # INSPECTOR
     # =====================================================
 
     with inspector_col:
@@ -513,27 +411,56 @@ if selected_file:
 
         st.subheader("Pathway Inspector")
 
-        st.info(
-            "Interactive node and edge inspection will appear here after Cytoscape event synchronization is integrated."
-        )
+        if selected:
 
-        st.write("### Example Node Metadata")
+            selected_id = None
 
-        sample_node = list(node_metadata.keys())[0]
+            if "id" in selected:
+                selected_id = selected["id"]
 
-        st.code(
-            json.dumps(node_metadata[sample_node], indent=2),
-            language="json"
-        )
+            # =================================================
+            # NODE
+            # =================================================
 
-        st.write("### Example Edge Metadata")
+            if selected_id in node_metadata:
 
-        sample_edge = list(edge_metadata.keys())[0]
+                st.success("Node Selected")
 
-        st.code(
-            json.dumps(edge_metadata[sample_edge], indent=2),
-            language="json"
-        )
+                st.code(
+                    json.dumps(
+                        node_metadata[selected_id],
+                        indent=2
+                    ),
+                    language="json"
+                )
+
+            # =================================================
+            # EDGE
+            # =================================================
+
+            elif selected_id in edge_metadata:
+
+                st.success("Edge Selected")
+
+                st.code(
+                    json.dumps(
+                        edge_metadata[selected_id],
+                        indent=2
+                    ),
+                    language="json"
+                )
+
+            else:
+
+                st.info(
+                    "Click a node or edge to inspect metadata."
+                )
+
+        else:
+
+            st.info(
+                "Click a node or edge to inspect metadata."
+            )
 
         st.markdown(
             "</div>",
