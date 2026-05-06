@@ -11,7 +11,7 @@ def render_relation_explorer(
     df_cross
 ):
 
-  st.markdown("## Relation Explorer")
+    st.markdown("## Relation Explorer")
 
     # =====================================
     # MAIN RELATIONS
@@ -39,7 +39,8 @@ def render_relation_explorer(
             related_main,
             use_container_width=True
         )
-   else:
+
+    else:
 
         st.info(
             "No main-chain relations"
@@ -71,8 +72,9 @@ def render_relation_explorer(
             related_cross,
             use_container_width=True
         )
-     else:
+
+    else:
 
         st.info(
             "No cross-pathway relations"
-        )     
+        )
