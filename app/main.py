@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# LIGHT UI CSS
+# CSS
 # =========================================================
 
 st.markdown(
@@ -61,11 +61,31 @@ st.markdown(
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
     }
 
-    .metric-box {
+    .inspector-box {
         background-color: #FFFFFF;
-        border-radius: 20px;
-        padding: 12px;
-        box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
+        border-radius: 24px;
+        padding: 20px;
+        box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
+        height: 980px;
+        overflow-y: auto;
+    }
+
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #1D1D1F !important;
+    }
+
+    div[data-baseweb="popover"] {
+        background-color: #FFFFFF !important;
+    }
+
+    div[role="listbox"] {
+        background-color: #FFFFFF !important;
+    }
+
+    div[role="option"] {
+        background-color: #FFFFFF !important;
+        color: #1D1D1F !important;
     }
 
     </style>
@@ -91,6 +111,22 @@ st.markdown(
 
 UPSTREAM_DIR = Path("data/upstream")
 DOWNSTREAM_DIR = Path("data/downstream")
+
+METADATA_FILE = Path(
+    "data/metadata/14. Annotated_Keggid_Metadata.xlsx"
+)
+
+# =========================================================
+# LOAD METADATA
+# =========================================================
+
+metadata_df = pd.read_excel(METADATA_FILE)
+
+metadata_lookup = {}
+
+for _, row in metadata_df.iterrows():
+
+    metadata_lookup[str(row["KEGG_ID"])] = row.to_dict()
 
 # =========================================================
 # SIDEBAR
@@ -125,7 +161,7 @@ selected_file = st.sidebar.selectbox(
 )
 
 # =========================================================
-# LOAD DATA
+# LOAD NETWORK
 # =========================================================
 
 if selected_file:
@@ -143,17 +179,37 @@ if selected_file:
     sheet2 = pd.read_excel(file_path, sheet_name=1)
 
     # =====================================================
-    # BUILD GRAPH
+    # GRAPH
     # =====================================================
 
     G = nx.DiGraph()
 
+    node_metadata = {}
+    edge_metadata = {}
+
+    # =====================================================
     # MAIN CHAIN
+    # =====================================================
+
     for _, row in sheet1.iterrows():
 
         source = str(row["Source_NodeID"])
         target = str(row["Target_NodeID"])
 
+        source_kegg = str(row["Source"])
+        target_kegg = str(row["Target"])
+
+        interaction = str(row["Interaction"])
+
+        # NODE CLASSIFICATION
+
+        node_type = "protein"
+
+        if "GErel" in interaction:
+            node_type = "gene"
+
+        # ADD NODES
+
         G.add_node(
             source,
             node_type="main_chain"
@@ -163,22 +219,58 @@ if selected_file:
             target,
             node_type="main_chain"
         )
+
+        # NODE METADATA
+
+        node_metadata[source] = {
+            "Node ID": source,
+            "KEGG IDs": source_kegg,
+            "GO IDs": row.get("Source_GO_IDs", ""),
+            "GO Labels": row.get("Source_GO_Labels", ""),
+            "Classification": node_type
+        }
+
+        node_metadata[target] = {
+            "Node ID": target,
+            "KEGG IDs": target_kegg,
+            "GO IDs": row.get("Target_GO_IDs", ""),
+            "GO Labels": row.get("Target_GO_Labels", ""),
+            "Classification": node_type
+        }
+
+        # EDGE
+
+        relation_id = str(row["RelationID"])
 
         G.add_edge(
             source,
             target,
-            relation_id=row["RelationID"],
-            interaction=row["Interaction"],
+            relation_id=relation_id,
+            interaction=interaction,
             edge_type="main_chain"
         )
 
+        edge_metadata[relation_id] = {
+            "Relation ID": relation_id,
+            "Cluster ID": row["ClusterID"],
+            "Interaction": interaction,
+            "Source Node": source,
+            "Target Node": target,
+            "Pathway": row["Pathway_Name"]
+        }
+
+    # =====================================================
     # CROSS PATHWAY
+    # =====================================================
+
     if show_cross_pathway:
 
         for _, row in sheet2.iterrows():
 
             source = str(row["Chain_Node"])
             target = str(row["Connected_Node"])
+
+            relation_id = str(row["RelationID"])
 
             G.add_node(
                 target,
@@ -188,10 +280,18 @@ if selected_file:
             G.add_edge(
                 source,
                 target,
-                relation_id=row["RelationID"],
+                relation_id=relation_id,
                 interaction=row["Interaction"],
                 edge_type="cross_pathway"
             )
+
+            edge_metadata[relation_id] = {
+                "Relation ID": relation_id,
+                "Interaction": row["Interaction"],
+                "Connected Pathway": row["Connected_Pathway"],
+                "Source Node": source,
+                "Target Node": target
+            }
 
     # =====================================================
     # STATS
@@ -224,196 +324,238 @@ if selected_file:
     with m4:
         st.metric("Cross Links", len(sheet2))
 
-    st.write("")
-
     # =====================================================
-    # MAIN GRAPH PANEL
+    # LAYOUT
     # =====================================================
 
-    st.markdown(
-        '<div class="network-box">',
-        unsafe_allow_html=True
-    )
-
-    st.subheader("Biological Pathway Workspace")
+    graph_col, inspector_col = st.columns([5, 1.6])
 
     # =====================================================
-    # CYTOSCAPE ELEMENTS
+    # GRAPH
     # =====================================================
 
-    nodes = []
-    edges = []
+    with graph_col:
 
-    # NODES
-    for node in G.nodes():
+        st.markdown(
+            '<div class="network-box">',
+            unsafe_allow_html=True
+        )
 
-        node_data = G.nodes[node]
+        st.subheader("Biological Pathway Workspace")
 
-        degree = G.degree(node)
+        nodes = []
+        edges = []
 
-        if node_data["node_type"] == "main_chain":
+        # =================================================
+        # NODES
+        # =================================================
 
-            color = "#4F8EF7"
-            size = 22 + (degree * 1.2)
-            shape = "ellipse"
+        for node in G.nodes():
 
-        else:
+            degree = G.degree(node)
 
-            color = "#D6E6FF"
-            size = 14 + (degree * 0.4)
-            shape = "round-rectangle"
+            node_type = G.nodes[node]["node_type"]
 
-        nodes.append({
-            "data": {
-                "id": node,
-                "label": node,
-                "color": color,
-                "size": size,
-                "shape": shape,
-                "degree": degree
-            }
-        })
+            if node_type == "main_chain":
 
-    # EDGES
-    for source, target, data in G.edges(data=True):
+                color = "#4F8EF7"
+                size = 22 + (degree * 1.2)
+                shape = "ellipse"
 
-        if data["edge_type"] == "main_chain":
+            else:
 
-            edge_color = "#4F8EF7"
-            width = 2.5
+                color = "#D6E6FF"
+                size = 15 + (degree * 0.5)
+                shape = "round-rectangle"
 
-        else:
+            nodes.append({
+                "data": {
+                    "id": node,
+                    "label": node,
+                    "color": color,
+                    "size": size,
+                    "shape": shape
+                }
+            })
 
-            edge_color = "#C8DBFF"
-            width = 1
+        # =================================================
+        # EDGES
+        # =================================================
 
-        edges.append({
-            "data": {
-                "source": source,
-                "target": target,
-                "label": data["relation_id"],
-                "color": edge_color,
-                "width": width
-            }
-        })
+        for source, target, data in G.edges(data=True):
 
-    cytoscape_data = {
-        "nodes": nodes,
-        "edges": edges
-    }
+            if data["edge_type"] == "main_chain":
 
-    # =====================================================
-    # CYTOSCAPE HTML
-    # =====================================================
+                edge_color = "#4F8EF7"
+                width = 2.5
 
-    html_code = f"""
-    <!DOCTYPE html>
-    <html>
+            else:
 
-    <head>
+                edge_color = "#C8DBFF"
+                width = 1
 
-    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+            edges.append({
+                "data": {
+                    "id": data["relation_id"],
+                    "source": source,
+                    "target": target,
+                    "label": data["relation_id"],
+                    "color": edge_color,
+                    "width": width
+                }
+            })
 
-    <style>
+        elements = nodes + edges
 
-    body {{
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background: #F8F9FB;
-    }}
+        # =================================================
+        # CYTOSCAPE HTML
+        # =================================================
 
-    #cy {{
-        width: 100%;
-        height: 950px;
-        background: #F8F9FB;
-        border-radius: 18px;
-    }}
+        html_code = f"""
+        <!DOCTYPE html>
+        <html>
 
-    </style>
+        <head>
 
-    </head>
+        <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
 
-    <body>
+        <style>
 
-    <div id="cy"></div>
-
-    <script>
-
-    const elements = {json.dumps(cytoscape_data["nodes"] + cytoscape_data["edges"])};
-
-    const cy = cytoscape({{
-
-        container: document.getElementById('cy'),
-
-        elements: elements,
-
-        style: [
-
-            {{
-                selector: 'node',
-                style: {{
-                    'background-color': 'data(color)',
-                    'label': 'data(label)',
-                    'width': 'data(size)',
-                    'height': 'data(size)',
-                    'shape': 'data(shape)',
-                    'font-size': '10px',
-                    'text-valign': 'center',
-                    'text-halign': 'center',
-                    'color': '#1D1D1F',
-                    'border-width': 2,
-                    'border-color': '#FFFFFF',
-                    'overlay-opacity': 0
-                }}
-            }},
-
-            {{
-                selector: 'edge',
-                style: {{
-                    'width': 'data(width)',
-                    'line-color': 'data(color)',
-                    'target-arrow-color': 'data(color)',
-                    'target-arrow-shape': 'triangle',
-                    'curve-style': 'bezier',
-                    'opacity': 0.7
-                }}
-            }}
-
-        ],
-
-        layout: {{
-            name: 'cose',
-            animate: true,
-            fit: true,
-            padding: 60,
-            nodeRepulsion: 900000,
-            idealEdgeLength: 120,
-            edgeElasticity: 100,
-            gravity: 0.25
+        body {{
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #F8F9FB;
         }}
 
-    }});
+        #cy {{
+            width: 100%;
+            height: 920px;
+            background: #F8F9FB;
+            border-radius: 20px;
+        }}
 
-    </script>
+        </style>
 
-    </body>
+        </head>
 
-    </html>
-    """
+        <body>
 
-    html(
-        html_code,
-        height=980
-    )
+        <div id="cy"></div>
 
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
-    )
+        <script>
+
+        const cy = cytoscape({{
+
+            container: document.getElementById('cy'),
+
+            elements: {json.dumps(elements)},
+
+            style: [
+
+                {{
+                    selector: 'node',
+                    style: {{
+                        'background-color': 'data(color)',
+                        'label': 'data(label)',
+                        'width': 'data(size)',
+                        'height': 'data(size)',
+                        'shape': 'data(shape)',
+                        'font-size': '10px',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'color': '#1D1D1F',
+                        'border-width': 2,
+                        'border-color': '#FFFFFF'
+                    }}
+                }},
+
+                {{
+                    selector: 'edge',
+                    style: {{
+                        'width': 'data(width)',
+                        'line-color': 'data(color)',
+                        'target-arrow-color': 'data(color)',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'opacity': 0.75
+                    }}
+                }}
+
+            ],
+
+            layout: {{
+                name: 'cose',
+                animate: true,
+                fit: true,
+                padding: 60,
+                nodeRepulsion: 800000,
+                idealEdgeLength: 130,
+                edgeElasticity: 100,
+                gravity: 0.25
+            }}
+
+        }});
+
+        </script>
+
+        </body>
+
+        </html>
+        """
+
+        html(
+            html_code,
+            height=950
+        )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
 
     # =====================================================
-    # TABLE SECTION
+    # INSPECTOR
+    # =====================================================
+
+    with inspector_col:
+
+        st.markdown(
+            '<div class="inspector-box">',
+            unsafe_allow_html=True
+        )
+
+        st.subheader("Pathway Inspector")
+
+        st.write("### Pathways")
+
+        for pathway in pathways:
+            st.write(f"• {pathway}")
+
+        st.write("### Network Summary")
+
+        st.write(f"Nodes: {node_count}")
+        st.write(f"Edges: {edge_count}")
+
+        st.write("### Node Metadata Preview")
+
+        sample_node = list(node_metadata.keys())[0]
+
+        st.json(node_metadata[sample_node])
+
+        st.write("### Edge Metadata Preview")
+
+        sample_edge = list(edge_metadata.keys())[0]
+
+        st.json(edge_metadata[sample_edge])
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
+
+    # =====================================================
+    # TABLES
     # =====================================================
 
     with st.expander("Main Chain Relations Table"):
