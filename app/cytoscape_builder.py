@@ -37,11 +37,34 @@ def build_elements(
 
     added_nodes = set()
 
+    gene_nodes = set()
+
+    # =====================================
+    # IDENTIFY GENE NODES
+    # =====================================
+
+    for _, row in df_main.iterrows():
+
+        interaction = str(
+            row["Interaction"]
+        )
+
+        target = str(
+            row["Target_NodeID"]
+        )
+
+        if "GErel" in interaction:
+            gene_nodes.add(target)
+
     # =====================================
     # MAIN CHAIN
     # =====================================
 
     for _, row in df_main.iterrows():
+
+        relation_id = str(
+            row["RelationID"]
+        )
 
         source = str(
             row["Source_NodeID"]
@@ -55,26 +78,29 @@ def build_elements(
             row["Interaction"]
         )
 
+        pathway_name = str(
+            row.get("Pathway_Name", "")
+        )
+
+        edge_color = get_edge_color(
+            interaction
+        )
+
         # =================================
         # SOURCE NODE
         # =================================
 
         if source not in added_nodes:
 
-            node_info = metadata.get(
-                source,
-                {}
-            )
+            node_type = "Protein"
 
-            node_type = node_info.get(
-                "type",
-                "Protein"
-            )
+            if source in gene_nodes:
+                node_type = "Gene"
 
-            color = "#4DA6FF"
+            node_color = "#4DA6FF"
 
             if node_type == "Gene":
-                color = "#00FFAA"
+                node_color = "#00FFAA"
 
             elements.append({
 
@@ -82,7 +108,11 @@ def build_elements(
 
                     "id": source,
 
-                    "label": source
+                    "label": source,
+
+                    "node_type": node_type,
+
+                    "node_color": node_color
                 },
 
                 "classes": "main"
@@ -96,20 +126,15 @@ def build_elements(
 
         if target not in added_nodes:
 
-            node_info = metadata.get(
-                target,
-                {}
-            )
+            node_type = "Protein"
 
-            node_type = node_info.get(
-                "type",
-                "Protein"
-            )
+            if target in gene_nodes:
+                node_type = "Gene"
 
-            color = "#4DA6FF"
+            node_color = "#4DA6FF"
 
             if node_type == "Gene":
-                color = "#00FFAA"
+                node_color = "#00FFAA"
 
             elements.append({
 
@@ -117,7 +142,11 @@ def build_elements(
 
                     "id": target,
 
-                    "label": target
+                    "label": target,
+
+                    "node_type": node_type,
+
+                    "node_color": node_color
                 },
 
                 "classes": "main"
@@ -133,11 +162,19 @@ def build_elements(
 
             "data": {
 
+                "id": relation_id,
+
                 "source": source,
 
                 "target": target,
 
-                "label": interaction
+                "label": interaction,
+
+                "interaction": interaction,
+
+                "pathway": pathway_name,
+
+                "edge_color": edge_color
             }
         })
 
@@ -148,6 +185,10 @@ def build_elements(
     if include_cross_nodes:
 
         for _, row in df_cross.iterrows():
+
+            relation_id = str(
+                row["RelationID"]
+            )
 
             chain_node = str(
                 row["Chain_Node"]
@@ -169,7 +210,11 @@ def build_elements(
 
                         "id": connected_node,
 
-                        "label": connected_node
+                        "label": connected_node,
+
+                        "node_type": "CrossPathway",
+
+                        "node_color": "#8C7AE6"
                     },
 
                     "classes": "cross"
@@ -187,11 +232,15 @@ def build_elements(
 
                 "data": {
 
+                    "id": f"cross_{relation_id}",
+
                     "source": chain_node,
 
                     "target": connected_node,
 
-                    "label": "Cross Pathway"
+                    "label": "Cross Pathway",
+
+                    "edge_color": "#AAAAAA"
                 },
 
                 "classes": "cross_edge"
@@ -221,9 +270,13 @@ def get_stylesheet():
 
                 "color": "white",
 
-                "font-size": "12px",
+                "font-size": "10px",
 
-                "background-color": "#4DA6FF",
+                "text-valign": "center",
+
+                "text-halign": "center",
+
+                "background-color": "data(node_color)",
 
                 "border-width": 2,
 
@@ -244,18 +297,16 @@ def get_stylesheet():
 
             "style": {
 
-                "background-color": "#8C7AE6",
+                "opacity": 0.7,
 
-                "opacity": 0.5,
+                "width": 22,
 
-                "width": 20,
-
-                "height": 20
+                "height": 22
             }
         },
 
         # =================================
-        # EDGES
+        # DEFAULT EDGES
         # =================================
 
         {
@@ -267,11 +318,13 @@ def get_stylesheet():
 
                 "target-arrow-shape": "triangle",
 
-                "line-color": "#999999",
+                "line-color": "data(edge_color)",
 
-                "target-arrow-color": "#999999",
+                "target-arrow-color": "data(edge_color)",
 
-                "width": 3
+                "width": 3,
+
+                "arrow-scale": 1.2
             }
         },
 
@@ -288,7 +341,22 @@ def get_stylesheet():
 
                 "opacity": 0.5,
 
-                "width": 1
+                "width": 1.5
+            }
+        },
+
+        # =================================
+        # SELECTED NODE
+        # =================================
+
+        {
+            "selector": ":selected",
+
+            "style": {
+
+                "border-width": 5,
+
+                "border-color": "#FFD700"
             }
         }
     ]
@@ -319,7 +387,9 @@ def render_cytoscape(
         stylesheet=get_stylesheet(),
 
         layout={
-            "name": "cose"
+            "name": "breadthfirst",
+            "directed": True,
+            "padding": 10
         },
 
         key="bcl2_network"
