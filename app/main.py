@@ -201,14 +201,10 @@ if selected_file:
 
         interaction = str(row["Interaction"])
 
-        # NODE CLASSIFICATION
-
         node_type = "protein"
 
         if "GErel" in interaction:
             node_type = "gene"
-
-        # ADD NODES
 
         G.add_node(
             source,
@@ -219,8 +215,6 @@ if selected_file:
             target,
             node_type="main_chain"
         )
-
-        # NODE METADATA
 
         node_metadata[source] = {
             "Node ID": source,
@@ -237,8 +231,6 @@ if selected_file:
             "GO Labels": row.get("Target_GO_Labels", ""),
             "Classification": node_type
         }
-
-        # EDGE
 
         relation_id = str(row["RelationID"])
 
@@ -300,12 +292,6 @@ if selected_file:
     node_count = len(G.nodes())
     edge_count = len(G.edges())
 
-    pathways = (
-        sheet1["Pathway_Name"]
-        .dropna()
-        .unique()
-    )
-
     # =====================================================
     # METRICS
     # =====================================================
@@ -319,19 +305,19 @@ if selected_file:
         st.metric("Edges", edge_count)
 
     with m3:
-        st.metric("Pathways", len(pathways))
+        st.metric("Main Chain", len(sheet1))
 
     with m4:
         st.metric("Cross Links", len(sheet2))
 
     # =====================================================
-    # LAYOUT
+    # MAIN LAYOUT
     # =====================================================
 
     graph_col, inspector_col = st.columns([5, 1.6])
 
     # =====================================================
-    # GRAPH
+    # GRAPH PANEL
     # =====================================================
 
     with graph_col:
@@ -515,7 +501,7 @@ if selected_file:
         )
 
     # =====================================================
-    # INSPECTOR
+    # INSPECTOR PANEL
     # =====================================================
 
     with inspector_col:
@@ -527,27 +513,27 @@ if selected_file:
 
         st.subheader("Pathway Inspector")
 
-        st.write("### Pathways")
+        st.info(
+            "Interactive node and edge inspection will appear here after Cytoscape event synchronization is integrated."
+        )
 
-        for pathway in pathways:
-            st.write(f"• {pathway}")
-
-        st.write("### Network Summary")
-
-        st.write(f"Nodes: {node_count}")
-        st.write(f"Edges: {edge_count}")
-
-        st.write("### Node Metadata Preview")
+        st.write("### Example Node Metadata")
 
         sample_node = list(node_metadata.keys())[0]
 
-        st.json(node_metadata[sample_node])
+        st.code(
+            json.dumps(node_metadata[sample_node], indent=2),
+            language="json"
+        )
 
-        st.write("### Edge Metadata Preview")
+        st.write("### Example Edge Metadata")
 
         sample_edge = list(edge_metadata.keys())[0]
 
-        st.json(edge_metadata[sample_edge])
+        st.code(
+            json.dumps(edge_metadata[sample_edge], indent=2),
+            language="json"
+        )
 
         st.markdown(
             "</div>",
