@@ -22,7 +22,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# CSS
+# LIGHT UI
 # =========================================================
 
 st.markdown(
@@ -47,7 +47,7 @@ st.markdown(
     h1, h2, h3 {
         color: #1D1D1F !important;
         font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        font-weight: 600;
+        font-weight: 700;
     }
 
     p, div, span, label {
@@ -63,7 +63,7 @@ st.markdown(
     .network-box {
         background-color: #FFFFFF;
         border-radius: 24px;
-        padding: 18px;
+        padding: 20px;
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
     }
 
@@ -73,7 +73,6 @@ st.markdown(
         padding: 20px;
         box-shadow: 0px 4px 14px rgba(0,0,0,0.06);
         min-height: 900px;
-        overflow-y: auto;
     }
 
     div[data-baseweb="select"] > div {
@@ -151,7 +150,7 @@ show_cross_pathway = st.sidebar.toggle(
 )
 
 # =========================================================
-# LOAD FILES
+# FILES
 # =========================================================
 
 if network_type == "Upstream":
@@ -176,10 +175,6 @@ if selected_file:
         file_path = UPSTREAM_DIR / selected_file
     else:
         file_path = DOWNSTREAM_DIR / selected_file
-
-    # =====================================================
-    # READ EXCEL
-    # =====================================================
 
     sheet1 = pd.read_excel(file_path, sheet_name=0)
     sheet2 = pd.read_excel(file_path, sheet_name=1)
@@ -334,7 +329,7 @@ if selected_file:
         st.metric("Cross Links", len(sheet2))
 
     # =====================================================
-    # BUILD NODES
+    # BUILD GRAPH
     # =====================================================
 
     nodes = []
@@ -366,20 +361,13 @@ if selected_file:
 
         )
 
-    # =====================================================
-    # BUILD EDGES
-    # =====================================================
-
     edges = []
 
     for source, target, data in G.edges(data=True):
 
         if data["edge_type"] == "main_chain":
-
             color = "#4F8EF7"
-
         else:
-
             color = "#C8DBFF"
 
         edge_label = data["relation_id"].split("|")[0].strip()
@@ -417,7 +405,7 @@ if selected_file:
     graph_col, inspector_col = st.columns([5, 1.8])
 
     # =====================================================
-    # GRAPH PANEL
+    # GRAPH
     # =====================================================
 
     with graph_col:
@@ -435,55 +423,81 @@ if selected_file:
             config=config
         )
 
-        st.markdown("---")
+        # =================================================
+        # EDGE INSPECTOR
+        # =================================================
 
+        st.markdown("---")
         st.markdown("## Edge Inspector")
 
-        search_relation = st.text_input(
-            "Search Relation ID"
+        all_relation_ids = sorted(
+            list(edge_metadata.keys())
         )
 
-        interaction_filter = st.multiselect(
-            "Filter Interaction Types",
-            sorted(
-                list(
-                    set(
-                        [
-                            edge_metadata[e]["Interaction"]
-                            for e in edge_metadata
-                            if "Interaction" in edge_metadata[e]
-                        ]
-                    )
+        st.caption(
+            f"Total Relations in Current Chain: {len(all_relation_ids)}"
+        )
+
+        connected_edges = []
+
+        if selected_node:
+
+            st.info(
+                f"Showing relations connected to node: {selected_node}"
+            )
+
+            for edge_id, edge_info in edge_metadata.items():
+
+                source_match = (
+                    edge_info.get("Source Node") == selected_node
+                )
+
+                target_match = (
+                    edge_info.get("Target Node") == selected_node
+                )
+
+                if source_match or target_match:
+                    connected_edges.append(edge_id)
+
+        else:
+
+            connected_edges = all_relation_ids
+
+        interaction_options = sorted(
+            list(
+                set(
+                    [
+                        edge_metadata[e]["Interaction"]
+                        for e in connected_edges
+                        if "Interaction" in edge_metadata[e]
+                    ]
                 )
             )
         )
 
+        interaction_filter = st.multiselect(
+            "Filter Interaction Types",
+            interaction_options
+        )
+
         filtered_edges = []
 
-        for edge_id, edge_info in edge_metadata.items():
+        for edge_id in connected_edges:
+
+            edge_info = edge_metadata[edge_id]
 
             include_edge = True
 
-            if search_relation:
-
-                if search_relation.lower() not in edge_id.lower():
-                    include_edge = False
-
             if interaction_filter:
 
-                interaction_value = edge_info.get(
-                    "Interaction",
-                    ""
-                )
-
-                if interaction_value not in interaction_filter:
+                if edge_info.get("Interaction") not in interaction_filter:
                     include_edge = False
 
             if include_edge:
                 filtered_edges.append(edge_id)
 
         selected_edge = st.selectbox(
-            "Select Edge Relation",
+            "Select Relation ID",
             filtered_edges,
             key="edge_selector"
         )
@@ -507,22 +521,22 @@ if selected_file:
         st.subheader("Pathway Inspector")
 
         # =================================================
-        # NODE METADATA
+        # NODE DETAILS
         # =================================================
 
         st.markdown("### Node Metadata")
 
         if selected_node:
 
-            selected_id = selected_node
+            if selected_node in node_metadata:
 
-            if selected_id in node_metadata:
-
-                st.success(f"Node Selected: {selected_id}")
+                st.success(
+                    f"Node Selected: {selected_node}"
+                )
 
                 st.code(
                     json.dumps(
-                        node_metadata[selected_id],
+                        node_metadata[selected_node],
                         indent=2
                     ),
                     language="json"
@@ -531,21 +545,20 @@ if selected_file:
             else:
 
                 st.info(
-                    "Selected node metadata not found."
+                    "Node metadata unavailable."
                 )
 
         else:
 
             st.info(
-                "Click a node to inspect metadata."
+                "Click a node in the graph."
             )
 
         # =================================================
-        # EDGE METADATA
+        # EDGE DETAILS
         # =================================================
 
         st.markdown("---")
-
         st.markdown("### Edge Metadata")
 
         if selected_edge:
@@ -569,7 +582,7 @@ if selected_file:
             else:
 
                 st.info(
-                    "Edge metadata not found."
+                    "Edge metadata unavailable."
                 )
 
         st.markdown(
