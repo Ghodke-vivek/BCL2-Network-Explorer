@@ -14,6 +14,7 @@ from styles import (
     DEFAULT_EDGE_COLOR
 )
 
+
 # =========================================
 # EDGE COLOR
 # =========================================
@@ -49,12 +50,12 @@ def get_node_color(info):
     if info["type"] == "Gene":
         return "#00FFAA"
 
-    # Protein/general nodes
+    # Default proteins/general nodes
     return "#3FA7FF"
 
 
 # =========================================
-# GET DISPLAY LABEL
+# DISPLAY LABEL
 # =========================================
 
 def get_display_label(node, info):
@@ -64,7 +65,7 @@ def get_display_label(node, info):
         []
     )
 
-    # Try HSA Symbols first
+    # Use HSA symbol if available
     for item in biological_data:
 
         symbol = str(
@@ -73,12 +74,12 @@ def get_display_label(node, info):
 
         if symbol and symbol != "nan":
 
-            # Multiple symbols
+            # Multiple symbols handling
             symbol = symbol.split("|")[0]
 
             return symbol
 
-    # Fallback = NodeID
+    # Fallback
     return node
 
 
@@ -112,7 +113,6 @@ def generate_tooltip(node, info):
         item = biological_data[0]
 
         tooltip += f"""
-
         <hr>
 
         <b>KEGG Name:</b><br>
@@ -182,7 +182,7 @@ def build_network(
             )
 
     # =====================================
-    # CREATE PYVIS NETWORK
+    # CREATE NETWORK
     # =====================================
 
     net = Network(
@@ -194,7 +194,7 @@ def build_network(
     )
 
     # =====================================
-    # PHYSICS OPTIONS
+    # PHYSICS
     # =====================================
 
     net.barnes_hut(
@@ -233,11 +233,8 @@ def build_network(
         # =================================
 
         if info["cross_node"]:
-
             size = 10
-
         else:
-
             size = 20 + (degree * 2)
 
         # =================================
@@ -248,16 +245,14 @@ def build_network(
         border_color = "#FFFFFF"
 
         if degree >= 8:
-
             border_width = 5
             border_color = "#FFAA00"
 
         # =================================
-        # SELECTED NODE
+        # SELECTED NODE HIGHLIGHT
         # =================================
 
         if selected_node == node:
-
             size += 12
             border_width = 8
             border_color = "#FFFF00"
@@ -269,7 +264,6 @@ def build_network(
         shape = "dot"
 
         if info["type"] == "Gene":
-
             shape = "star"
 
         # =================================
@@ -279,7 +273,6 @@ def build_network(
         opacity = 1.0
 
         if info["cross_node"]:
-
             opacity = 0.55
 
         # =================================
@@ -324,11 +317,9 @@ def build_network(
 
         interaction = data["interaction"]
 
-        # Dashed for contextual edges
         dashes = False
 
         if interaction == "Cross Pathway":
-
             dashes = True
 
         net.add_edge(
