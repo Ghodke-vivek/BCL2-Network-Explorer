@@ -2,5 +2,5 @@ streamlit
 pandas
 openpyxl
 networkx
-pyvis
 streamlit-agraph
+streamlit-cytoscapejs
