@@ -1,5 +1,14 @@
-import pandas as pd
+from metadata_loader import (
+    load_metadata,
+    extract_kegg_ids
+)
 
+metadata_lookup = load_metadata()
+
+
+# =========================================
+# BUILD NODE METADATA
+# =========================================
 
 def build_node_metadata(df_main, df_cross):
 
@@ -16,28 +25,38 @@ def build_node_metadata(df_main, df_cross):
 
         interaction = str(row["Interaction"])
 
-        # ---------------------------------
-        # SOURCE
-        # ---------------------------------
+        source_kegg = extract_kegg_ids(
+            row.get("Source", "")
+        )
+
+        target_kegg = extract_kegg_ids(
+            row.get("Target", "")
+        )
+
+        # =================================
+        # SOURCE NODE
+        # =================================
 
         if source not in metadata:
 
             metadata[source] = {
-                "type": "Unknown",
+                "type": "Protein",
                 "cross_node": False,
-                "connections": 0
+                "connections": 0,
+                "kegg_ids": source_kegg
             }
 
-        # ---------------------------------
-        # TARGET
-        # ---------------------------------
+        # =================================
+        # TARGET NODE
+        # =================================
 
         if target not in metadata:
 
             metadata[target] = {
-                "type": "Unknown",
+                "type": "Protein",
                 "cross_node": False,
-                "connections": 0
+                "connections": 0,
+                "kegg_ids": target_kegg
             }
 
         # =================================
@@ -63,14 +82,37 @@ def build_node_metadata(df_main, df_cross):
 
         node = str(row["Connected_Node"])
 
+        target_kegg = extract_kegg_ids(
+            row.get("Target_KEGG_IDs", "")
+        )
+
         if node not in metadata:
 
             metadata[node] = {
-                "type": "Unknown",
+                "type": "Protein",
                 "cross_node": True,
-                "connections": 1
+                "connections": 1,
+                "kegg_ids": target_kegg
             }
 
         metadata[node]["cross_node"] = True
+
+    # =====================================
+    # ATTACH BIOLOGICAL METADATA
+    # =====================================
+
+    for node, info in metadata.items():
+
+        biological_data = []
+
+        for kid in info["kegg_ids"]:
+
+            if kid in metadata_lookup:
+
+                biological_data.append(
+                    metadata_lookup[kid]
+                )
+
+        metadata[node]["biological_data"] = biological_data
 
     return metadata
