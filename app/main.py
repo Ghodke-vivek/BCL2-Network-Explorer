@@ -202,9 +202,17 @@ if selected_file:
         source = str(row["Source_NodeID"])
         target = str(row["Target_NodeID"])
 
-        relation_id = str(row["RelationID"])
-
         interaction = str(row["Interaction"])
+
+        base_relation_id = str(row["RelationID"])
+
+        relation_id = (
+            base_relation_id
+            + " | "
+            + source
+            + " → "
+            + target
+        )
 
         source_kegg = str(row["Source"])
         target_kegg = str(row["Target"])
@@ -251,7 +259,7 @@ if selected_file:
         }
 
         edge_metadata[relation_id] = {
-            "Relation ID": relation_id,
+            "Relation ID": base_relation_id,
             "Cluster ID": row["ClusterID"],
             "Interaction": interaction,
             "Source Node": source,
@@ -272,7 +280,17 @@ if selected_file:
             source = str(row["Chain_Node"])
             target = str(row["Connected_Node"])
 
-            relation_id = str(row["RelationID"])
+            interaction = str(row["Interaction"])
+
+            base_relation_id = str(row["RelationID"])
+
+            relation_id = (
+                base_relation_id
+                + " | "
+                + source
+                + " → "
+                + target
+            )
 
             G.add_node(
                 target,
@@ -283,13 +301,13 @@ if selected_file:
                 source,
                 target,
                 relation_id=relation_id,
-                interaction=row["Interaction"],
+                interaction=interaction,
                 edge_type="cross_pathway"
             )
 
             edge_metadata[relation_id] = {
-                "Relation ID": relation_id,
-                "Interaction": row["Interaction"],
+                "Relation ID": base_relation_id,
+                "Interaction": interaction,
                 "Connected Pathway": row["Connected_Pathway"],
                 "Source Node": source,
                 "Target Node": target,
@@ -364,12 +382,14 @@ if selected_file:
 
             color = "#C8DBFF"
 
+        edge_label = data["relation_id"].split("|")[0].strip()
+
         edges.append(
 
             Edge(
                 source=source,
                 target=target,
-                label=data["relation_id"],
+                label=edge_label,
                 color=color
             )
 
