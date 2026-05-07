@@ -134,6 +134,38 @@ st.markdown(
     }
 
     /* =====================================================
+       DOWNLOAD BUTTONS
+    ===================================================== */
+
+    .stDownloadButton button {
+        background-color: #111827 !important;
+        color: #FFFFFF !important;
+        border-radius: 12px !important;
+        border: none !important;
+    }
+
+    .stDownloadButton button p {
+        color: #FFFFFF !important;
+    }
+
+    .stDownloadButton button span {
+        color: #FFFFFF !important;
+    }
+
+    .stDownloadButton button:hover {
+        background-color: #1F2937 !important;
+        color: #FFFFFF !important;
+    }
+
+    .stDownloadButton button:hover p {
+        color: #FFFFFF !important;
+    }
+
+    .stDownloadButton button:hover span {
+        color: #FFFFFF !important;
+    }
+
+    /* =====================================================
        CODE BLOCK
     ===================================================== */
 
@@ -146,7 +178,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
 # =========================================================
 # TITLE
 # =========================================================
