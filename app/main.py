@@ -50,7 +50,7 @@ st.markdown(
     }
 
     p, div, span, label {
-        color: #1D1D1F;
+        color: #1D1D1F !important;
         font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
@@ -58,30 +58,57 @@ st.markdown(
         display: none;
     }
 
+    /* =====================================================
+       SELECTBOX / MULTISELECT STYLING
+    ===================================================== */
+
     .stSelectbox div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        color: #1D1D1F !important;
+        background-color: #1E1E1E !important;
+        color: #FFFFFF !important;
         border-radius: 14px !important;
     }
 
     .stMultiSelect div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        color: #1D1D1F !important;
+        background-color: #1E1E1E !important;
+        color: #FFFFFF !important;
         border-radius: 14px !important;
     }
 
+    div[data-baseweb="select"] * {
+        color: #FFFFFF !important;
+    }
+
     div[role="listbox"] {
-        background-color: #FFFFFF !important;
+        background-color: #1E1E1E !important;
     }
 
     div[role="option"] {
-        background-color: #FFFFFF !important;
-        color: #1D1D1F !important;
+        background-color: #1E1E1E !important;
+        color: #FFFFFF !important;
     }
 
     div[role="option"]:hover {
-        background-color: #E9EEF9 !important;
+        background-color: #2F2F2F !important;
+        color: #FFFFFF !important;
     }
+
+    /* =====================================================
+       INPUT BOX
+    ===================================================== */
+
+    .stTextInput input {
+        background-color: #1E1E1E !important;
+        color: #FFFFFF !important;
+        border-radius: 12px !important;
+    }
+
+    .stTextInput input::placeholder {
+        color: #B0B0B0 !important;
+    }
+
+    /* =====================================================
+       CODE BLOCK
+    ===================================================== */
 
     .stCodeBlock {
         border-radius: 16px;
@@ -262,8 +289,6 @@ main_chain_nodes = set(G.nodes())
 # CROSS PATHWAY
 # =========================================================
 
-show_cross_pathway = True
-
 for _, row in sheet2.iterrows():
 
     source = str(row["Chain_Node"])
@@ -345,38 +370,39 @@ with left_col:
         key="network_direction_main"
     )
 
-    show_cross_pathway = st.toggle(
-        "Show Cross Pathway Nodes",
-        value=True
-    )
-
     st.markdown("### Search Node")
 
-    search_options = []
-
-    for node_id, meta in node_metadata.items():
-
-        hsa_symbol = meta.get("HSA Symbols", "")
-        kegg_id = meta.get("KEGG IDs", "")
-
-        label = (
-            f"{node_id} | "
-            f"{hsa_symbol} | "
-            f"{kegg_id}"
-        )
-
-        search_options.append(label)
-
-    selected_search = st.selectbox(
-        "Search by Node / HSA / KEGG",
-        [""] + sorted(search_options),
-        key="node_search"
+    search_query = st.text_input(
+        "Search by Node ID / HSA / KEGG",
+        placeholder="Example: N00162, TP53, ko:K04451"
     )
 
     searched_node = None
 
-    if selected_search:
-        searched_node = selected_search.split("|")[0].strip()
+    if search_query:
+
+        query = search_query.strip().lower()
+
+        for node_id, meta in node_metadata.items():
+
+            node_text = str(node_id).lower()
+
+            hsa_text = str(
+                meta.get("HSA Symbols", "")
+            ).lower()
+
+            kegg_text = str(
+                meta.get("KEGG IDs", "")
+            ).lower()
+
+            if (
+                query in node_text
+                or query in hsa_text
+                or query in kegg_text
+            ):
+
+                searched_node = node_id
+                break
 
     st.markdown("### Select Pathway")
 
@@ -488,10 +514,6 @@ with right_col:
 
     st.markdown("---")
 
-    # =====================================================
-    # NODE METADATA
-    # =====================================================
-
     st.markdown("### Node Metadata")
 
     if selected_node:
@@ -523,10 +545,6 @@ with right_col:
         )
 
     st.markdown("---")
-
-    # =====================================================
-    # EDGE INSPECTOR
-    # =====================================================
 
     st.markdown("### Edge Inspector")
 
@@ -616,10 +634,6 @@ with right_col:
         selected_edge = selected_edge_label.split("|")[0].strip()
 
         st.markdown("---")
-
-        # =====================================================
-        # EDGE METADATA
-        # =====================================================
 
         st.markdown("### Edge Metadata")
 
