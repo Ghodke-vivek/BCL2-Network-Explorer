@@ -53,6 +53,15 @@ st.markdown(
         font-weight: 700;
     }
 
+    /* =====================================================
+       NORMAL TEXT SHOULD STAY DARK
+    ===================================================== */
+
+    p, label, .stMarkdown, .stRadio label,
+    .stToggle label, .stMetric label {
+        color: #1D1D1F !important;
+    }
+
     section[data-testid="stSidebar"] {
         display: none;
     }
@@ -71,17 +80,23 @@ st.markdown(
         border-radius: 14px !important;
     }
 
-    /* Keep dropdown text white ONLY inside dropdowns */
+    /* ONLY dropdown selected values */
 
-.stSelectbox div[data-baseweb="select"] span {
-    color: #FFFFFF !important;
-}
+    .stSelectbox div[data-baseweb="select"] span {
+        color: #FFFFFF !important;
+    }
 
-.stMultiSelect div[data-baseweb="select"] span {
-    color: #FFFFFF !important;
-}
+    .stMultiSelect div[data-baseweb="select"] span {
+        color: #FFFFFF !important;
+    }
 
-    /* Dropdown popup menu */
+    /* =====================================================
+       DROPDOWN POPUP MENU
+    ===================================================== */
+
+    ul[data-testid="stSelectboxVirtualDropdown"] {
+        background-color: #1E1E1E !important;
+    }
 
     ul[data-testid="stSelectboxVirtualDropdown"] li {
         background-color: #1E1E1E !important;
@@ -93,14 +108,8 @@ st.markdown(
         color: #FFFFFF !important;
     }
 
-    /* Selected dropdown text */
-
-    div[data-baseweb="select"] span {
-        color: #FFFFFF !important;
-    }
-
     /* =====================================================
-       INPUT BOX
+       TEXT INPUT
     ===================================================== */
 
     .stTextInput input {
