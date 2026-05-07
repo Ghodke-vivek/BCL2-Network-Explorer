@@ -36,6 +36,10 @@ st.markdown(
         background-color: #F3F4F7;
     }
 
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
     .block-container {
         padding-top: 1rem;
         padding-left: 1rem;
@@ -49,28 +53,21 @@ st.markdown(
         font-weight: 700;
     }
 
-    p, div, span, label {
-        color: #1D1D1F !important;
-        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
     section[data-testid="stSidebar"] {
         display: none;
     }
 
     /* =====================================================
-       SELECTBOX / MULTISELECT STYLING
+       SELECTBOX / MULTISELECT
     ===================================================== */
 
     .stSelectbox div[data-baseweb="select"] > div {
         background-color: #1E1E1E !important;
-        color: #FFFFFF !important;
         border-radius: 14px !important;
     }
 
     .stMultiSelect div[data-baseweb="select"] > div {
         background-color: #1E1E1E !important;
-        color: #FFFFFF !important;
         border-radius: 14px !important;
     }
 
@@ -78,17 +75,21 @@ st.markdown(
         color: #FFFFFF !important;
     }
 
-    div[role="listbox"] {
-        background-color: #1E1E1E !important;
-    }
+    /* Dropdown popup menu */
 
-    div[role="option"] {
+    ul[data-testid="stSelectboxVirtualDropdown"] li {
         background-color: #1E1E1E !important;
         color: #FFFFFF !important;
     }
 
-    div[role="option"]:hover {
+    ul[data-testid="stSelectboxVirtualDropdown"] li:hover {
         background-color: #2F2F2F !important;
+        color: #FFFFFF !important;
+    }
+
+    /* Selected dropdown text */
+
+    div[data-baseweb="select"] span {
         color: #FFFFFF !important;
     }
 
@@ -286,67 +287,6 @@ for _, row in sheet1.iterrows():
 main_chain_nodes = set(G.nodes())
 
 # =========================================================
-# CROSS PATHWAY
-# =========================================================
-
-for _, row in sheet2.iterrows():
-
-    source = str(row["Chain_Node"])
-    target = str(row["Connected_Node"])
-
-    if source not in main_chain_nodes:
-        continue
-
-    if target in main_chain_nodes:
-        continue
-
-    G.add_node(target)
-
-    G.add_edge(
-        source,
-        target,
-        relation=row["RelationID"]
-    )
-
-    target_kegg = str(row.get("Target_KEGG_IDs", ""))
-
-    target_meta = metadata_lookup.get(target_kegg, {})
-
-    node_metadata[target] = {
-        "Node ID": target,
-        "KEGG IDs": target_kegg,
-        "Names": target_meta.get("Names", ""),
-        "HSA Symbols": target_meta.get("HSA Symbols", ""),
-        "HSA Biological Names": target_meta.get(
-            "HSA Biological Names", ""
-        ),
-        "UniProt IDs": target_meta.get("UniProt IDs", ""),
-        "GO IDs": str(row.get("Target_GO_IDs", "")),
-        "GO Labels": str(row.get("Target_GO_Labels", "")),
-        "Classification": "cross_pathway",
-        "Degree": G.degree(target)
-    }
-
-    edge_metadata[str(row["RelationID"])] = {
-        "Relation ID": str(row["RelationID"]),
-        "Interaction": str(row["Interaction"]),
-        "Source Node": source,
-        "Target Node": target,
-        "Pathway": str(row["Connected_Pathway"]),
-        "Source KEGG": str(row.get("Source_KEGG_IDs", "")),
-        "Target KEGG": target_kegg
-    }
-
-# =========================================================
-# UPDATE FINAL NODE DEGREES
-# =========================================================
-
-for node in G.nodes():
-
-    if node in node_metadata:
-        node_metadata[node]["Degree"] = G.degree(node)
-
-# =========================================================
 # MAIN LAYOUT
 # =========================================================
 
@@ -368,6 +308,11 @@ with left_col:
         " ",
         ["Upstream", "Downstream"],
         key="network_direction_main"
+    )
+
+    show_cross_pathway = st.toggle(
+        "Show Cross Pathway Nodes",
+        value=True
     )
 
     st.markdown("### Search Node")
@@ -411,6 +356,69 @@ with left_col:
         file_names,
         key="pathway_selector"
     )
+
+# =========================================================
+# CROSS PATHWAY
+# =========================================================
+
+if show_cross_pathway:
+
+    for _, row in sheet2.iterrows():
+
+        source = str(row["Chain_Node"])
+        target = str(row["Connected_Node"])
+
+        if source not in main_chain_nodes:
+            continue
+
+        if target in main_chain_nodes:
+            continue
+
+        G.add_node(target)
+
+        G.add_edge(
+            source,
+            target,
+            relation=row["RelationID"]
+        )
+
+        target_kegg = str(row.get("Target_KEGG_IDs", ""))
+
+        target_meta = metadata_lookup.get(target_kegg, {})
+
+        node_metadata[target] = {
+            "Node ID": target,
+            "KEGG IDs": target_kegg,
+            "Names": target_meta.get("Names", ""),
+            "HSA Symbols": target_meta.get("HSA Symbols", ""),
+            "HSA Biological Names": target_meta.get(
+                "HSA Biological Names", ""
+            ),
+            "UniProt IDs": target_meta.get("UniProt IDs", ""),
+            "GO IDs": str(row.get("Target_GO_IDs", "")),
+            "GO Labels": str(row.get("Target_GO_Labels", "")),
+            "Classification": "cross_pathway",
+            "Degree": G.degree(target)
+        }
+
+        edge_metadata[str(row["RelationID"])] = {
+            "Relation ID": str(row["RelationID"]),
+            "Interaction": str(row["Interaction"]),
+            "Source Node": source,
+            "Target Node": target,
+            "Pathway": str(row["Connected_Pathway"]),
+            "Source KEGG": str(row.get("Source_KEGG_IDs", "")),
+            "Target KEGG": target_kegg
+        }
+
+# =========================================================
+# UPDATE FINAL NODE DEGREES
+# =========================================================
+
+for node in G.nodes():
+
+    if node in node_metadata:
+        node_metadata[node]["Degree"] = G.degree(node)
 
 # =========================================================
 # GRAPH NODES
