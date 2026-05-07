@@ -102,12 +102,20 @@ st.markdown(
         color: #FFFFFF !important;
     }
 
+    ul[data-testid="stSelectboxVirtualDropdown"] * {
+        color: #FFFFFF !important;
+    }
+
     ul[data-testid="stSelectboxVirtualDropdown"] li:hover {
         background-color: #2F2F2F !important;
         color: #FFFFFF !important;
     }
 
     ul[data-testid="stSelectboxVirtualDropdown"] li:hover span {
+        color: #FFFFFF !important;
+    }
+
+    ul[data-testid="stSelectboxVirtualDropdown"] li:hover * {
         color: #FFFFFF !important;
     }
 
@@ -193,11 +201,9 @@ for _, row in metadata_df.iterrows():
 # NETWORK TYPE
 # =========================================================
 
-network_type_default = "Upstream"
-
 network_type = st.session_state.get(
     "network_direction_main",
-    network_type_default
+    "Upstream"
 )
 
 if network_type == "Upstream":
@@ -206,17 +212,6 @@ else:
     files = sorted(DOWNSTREAM_DIR.glob("*.xlsx"))
 
 file_names = [f.name for f in files]
-
-# =========================================================
-# DEFAULT FILE PATH
-# =========================================================
-
-if network_type == "Upstream":
-    default_file = file_names[0]
-    file_path = UPSTREAM_DIR / default_file
-else:
-    default_file = file_names[0]
-    file_path = DOWNSTREAM_DIR / default_file
 
 # =========================================================
 # MAIN LAYOUT
@@ -242,15 +237,10 @@ with left_col:
         key="network_direction_main"
     )
 
-    st.toggle(
+    show_cross_pathway = st.toggle(
         "Show Cross Pathway Nodes",
-        value=True,
-        key="cross_pathway_toggle"
+        value=True
     )
-
-    show_cross_pathway = st.session_state[
-        "cross_pathway_toggle"
-    ]
 
     st.markdown("### Search Node")
 
@@ -269,17 +259,17 @@ with left_col:
         key="pathway_selector"
     )
 
-    # =====================================================
-    # FILE PATH
-    # =====================================================
+# =========================================================
+# FILE PATH
+# =========================================================
 
-    if network_type == "Upstream":
-        file_path = UPSTREAM_DIR / selected_file
-    else:
-        file_path = DOWNSTREAM_DIR / selected_file
+if network_type == "Upstream":
+    file_path = UPSTREAM_DIR / selected_file
+else:
+    file_path = DOWNSTREAM_DIR / selected_file
 
 # =========================================================
-# READ EXCEL FILES
+# READ FILES
 # =========================================================
 
 sheet1 = pd.read_excel(file_path, sheet_name=0)
@@ -329,6 +319,15 @@ for _, row in sheet1.iterrows():
         {}
     )
 
+    normalized_target_kegg = (
+        target_kegg.replace("ko:", "").strip()
+    )
+
+    target_meta = metadata_lookup.get(
+        normalized_target_kegg,
+        {}
+    )
+
     node_metadata[source] = {
         "Node ID": source,
         "KEGG IDs": source_kegg,
@@ -343,15 +342,6 @@ for _, row in sheet1.iterrows():
         "Classification": source_class,
         "Degree": G.degree(source)
     }
-
-    normalized_target_kegg = (
-        target_kegg.replace("ko:", "").strip()
-    )
-
-    target_meta = metadata_lookup.get(
-        normalized_target_kegg,
-        {}
-    )
 
     node_metadata[target] = {
         "Node ID": target,
@@ -476,7 +466,7 @@ if show_cross_pathway:
         }
 
 # =========================================================
-# UPDATE FINAL NODE DEGREES
+# UPDATE DEGREES
 # =========================================================
 
 for node in G.nodes():
@@ -506,7 +496,7 @@ for node in G.nodes():
 
     if searched_node == node:
         color = "#FF6B6B"
-        size = size + 15
+        size += 15
 
     nodes.append(
         Node(
@@ -569,21 +559,12 @@ with center_col:
     if searched_node:
         selected_node = searched_node
 
-
-# =========================================================
-# NETWORK EXPORT
-# =========================================================
-
-import tempfile
-
-with center_col:
+    # =====================================================
+    # EXPORT NETWORK
+    # =====================================================
 
     st.markdown("---")
     st.subheader("Export Network")
-
-    # =====================================================
-    # EXPORT EDGE LIST CSV
-    # =====================================================
 
     edge_export_df = pd.DataFrame([
         {
@@ -603,10 +584,6 @@ with center_col:
         mime="text/csv"
     )
 
-    # =====================================================
-    # EXPORT NODE METADATA CSV
-    # =====================================================
-
     node_export_df = pd.DataFrame.from_dict(
         node_metadata,
         orient="index"
@@ -620,10 +597,6 @@ with center_col:
         file_name="bcl2_network_nodes.csv",
         mime="text/csv"
     )
-
-    # =====================================================
-    # EXPORT GRAPHML
-    # =====================================================
 
     with tempfile.NamedTemporaryFile(
         delete=False,
