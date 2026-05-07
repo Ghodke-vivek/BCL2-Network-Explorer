@@ -71,9 +71,15 @@ st.markdown(
         border-radius: 14px !important;
     }
 
-    div[data-baseweb="select"] * {
-        color: #FFFFFF !important;
-    }
+    /* Keep dropdown text white ONLY inside dropdowns */
+
+.stSelectbox div[data-baseweb="select"] span {
+    color: #FFFFFF !important;
+}
+
+.stMultiSelect div[data-baseweb="select"] span {
+    color: #FFFFFF !important;
+}
 
     /* Dropdown popup menu */
 
