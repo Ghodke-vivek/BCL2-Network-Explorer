@@ -53,10 +53,6 @@ st.markdown(
         font-weight: 700;
     }
 
-    /* =====================================================
-       NORMAL TEXT
-    ===================================================== */
-
     p, label, .stMarkdown, .stRadio label,
     .stToggle label, .stMetric label {
         color: #1D1D1F !important;
@@ -203,18 +199,79 @@ else:
 file_names = [f.name for f in files]
 
 # =========================================================
-# LOAD FILE
+# DEFAULT FILE PATH
 # =========================================================
 
-selected_file_default = file_names[0]
-
-if "pathway_selector" not in st.session_state:
-    st.session_state["pathway_selector"] = selected_file_default
-
 if network_type == "Upstream":
-    file_path = UPSTREAM_DIR / st.session_state["pathway_selector"]
+    default_file = file_names[0]
+    file_path = UPSTREAM_DIR / default_file
 else:
-    file_path = DOWNSTREAM_DIR / st.session_state["pathway_selector"]
+    default_file = file_names[0]
+    file_path = DOWNSTREAM_DIR / default_file
+
+# =========================================================
+# MAIN LAYOUT
+# =========================================================
+
+left_col, center_col, right_col = st.columns(
+    [1.1, 3.8, 1.5]
+)
+
+# =========================================================
+# LEFT PANEL
+# =========================================================
+
+with left_col:
+
+    st.subheader("Network Controls")
+
+    st.markdown("### Network Direction")
+
+    network_type = st.radio(
+        " ",
+        ["Upstream", "Downstream"],
+        key="network_direction_main"
+    )
+
+    st.toggle(
+        "Show Cross Pathway Nodes",
+        value=True,
+        key="cross_pathway_toggle"
+    )
+
+    show_cross_pathway = st.session_state[
+        "cross_pathway_toggle"
+    ]
+
+    st.markdown("### Search Node")
+
+    search_query = st.text_input(
+        "Search by Node ID / HSA / KEGG",
+        placeholder="Example: N00162, TP53, ko:K04451"
+    )
+
+    searched_node = None
+
+    st.markdown("### Select Pathway")
+
+    selected_file = st.selectbox(
+        " ",
+        file_names,
+        key="pathway_selector"
+    )
+
+    # =====================================================
+    # FILE PATH
+    # =====================================================
+
+    if network_type == "Upstream":
+        file_path = UPSTREAM_DIR / selected_file
+    else:
+        file_path = DOWNSTREAM_DIR / selected_file
+
+# =========================================================
+# READ EXCEL FILES
+# =========================================================
 
 sheet1 = pd.read_excel(file_path, sheet_name=0)
 sheet2 = pd.read_excel(file_path, sheet_name=1)
@@ -320,75 +377,33 @@ for _, row in sheet1.iterrows():
 main_chain_nodes = set(G.nodes())
 
 # =========================================================
-# MAIN LAYOUT
+# SEARCH
 # =========================================================
 
-left_col, center_col, right_col = st.columns(
-    [1.1, 3.8, 1.5]
-)
+if search_query:
 
-# =========================================================
-# LEFT PANEL
-# =========================================================
+    query = search_query.strip().lower()
 
-with left_col:
+    for node_id, meta in node_metadata.items():
 
-    st.subheader("Network Controls")
+        node_text = str(node_id).lower()
 
-    st.markdown("### Network Direction")
+        hsa_text = str(
+            meta.get("HSA Symbols", "")
+        ).lower()
 
-    network_type = st.radio(
-        " ",
-        ["Upstream", "Downstream"],
-        key="network_direction_main"
-    )
+        kegg_text = str(
+            meta.get("KEGG IDs", "")
+        ).lower()
 
-    show_cross_pathway = st.toggle(
-        "Show Cross Pathway Nodes",
-        value=True
-    )
+        if (
+            query in node_text
+            or query in hsa_text
+            or query in kegg_text
+        ):
 
-    st.markdown("### Search Node")
-
-    search_query = st.text_input(
-        "Search by Node ID / HSA / KEGG",
-        placeholder="Example: N00162, TP53, ko:K04451"
-    )
-
-    searched_node = None
-
-    if search_query:
-
-        query = search_query.strip().lower()
-
-        for node_id, meta in node_metadata.items():
-
-            node_text = str(node_id).lower()
-
-            hsa_text = str(
-                meta.get("HSA Symbols", "")
-            ).lower()
-
-            kegg_text = str(
-                meta.get("KEGG IDs", "")
-            ).lower()
-
-            if (
-                query in node_text
-                or query in hsa_text
-                or query in kegg_text
-            ):
-
-                searched_node = node_id
-                break
-
-    st.markdown("### Select Pathway")
-
-    selected_file = st.selectbox(
-        " ",
-        file_names,
-        key="pathway_selector"
-    )
+            searched_node = node_id
+            break
 
 # =========================================================
 # CROSS PATHWAY
