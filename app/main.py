@@ -239,18 +239,34 @@ for _, row in sheet1.iterrows():
         relation=row["RelationID"]
     )
 
+    source_meta = metadata_lookup.get(source_kegg, {})
+
     node_metadata[source] = {
         "Node ID": source,
         "KEGG IDs": source_kegg,
+        "Names": source_meta.get("Names", ""),
+        "HSA Symbols": source_meta.get("HSA Symbols", ""),
+        "HSA Biological Names": source_meta.get(
+            "HSA Biological Names", ""
+        ),
+        "UniProt IDs": source_meta.get("UniProt IDs", ""),
         "GO IDs": str(row.get("Source_GO_IDs", "")),
         "GO Labels": str(row.get("Source_GO_Labels", "")),
         "Classification": source_class,
         "Degree": G.degree(source)
     }
 
+    target_meta = metadata_lookup.get(target_kegg, {})
+
     node_metadata[target] = {
         "Node ID": target,
         "KEGG IDs": target_kegg,
+        "Names": target_meta.get("Names", ""),
+        "HSA Symbols": target_meta.get("HSA Symbols", ""),
+        "HSA Biological Names": target_meta.get(
+            "HSA Biological Names", ""
+        ),
+        "UniProt IDs": target_meta.get("UniProt IDs", ""),
         "GO IDs": str(row.get("Target_GO_IDs", "")),
         "GO Labels": str(row.get("Target_GO_Labels", "")),
         "Classification": target_class,
@@ -304,9 +320,19 @@ if show_cross_pathway:
             relation=row["RelationID"]
         )
 
+        target_kegg = str(row.get("Target_KEGG_IDs", ""))
+
+        target_meta = metadata_lookup.get(target_kegg, {})
+
         node_metadata[target] = {
             "Node ID": target,
-            "KEGG IDs": str(row.get("Target_KEGG_IDs", "")),
+            "KEGG IDs": target_kegg,
+            "Names": target_meta.get("Names", ""),
+            "HSA Symbols": target_meta.get("HSA Symbols", ""),
+            "HSA Biological Names": target_meta.get(
+                "HSA Biological Names", ""
+            ),
+            "UniProt IDs": target_meta.get("UniProt IDs", ""),
             "GO IDs": str(row.get("Target_GO_IDs", "")),
             "GO Labels": str(row.get("Target_GO_Labels", "")),
             "Classification": "cross_pathway",
@@ -320,8 +346,17 @@ if show_cross_pathway:
             "Target Node": target,
             "Pathway": str(row["Connected_Pathway"]),
             "Source KEGG": str(row.get("Source_KEGG_IDs", "")),
-            "Target KEGG": str(row.get("Target_KEGG_IDs", ""))
+            "Target KEGG": target_kegg
         }
+
+# =========================================================
+# UPDATE FINAL NODE DEGREES
+# =========================================================
+
+for node in G.nodes():
+
+    if node in node_metadata:
+        node_metadata[node]["Degree"] = G.degree(node)
 
 # =========================================================
 # GRAPH NODES
