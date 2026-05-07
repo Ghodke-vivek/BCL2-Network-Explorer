@@ -54,7 +54,7 @@ st.markdown(
     }
 
     /* =====================================================
-       NORMAL TEXT SHOULD STAY DARK
+       NORMAL TEXT
     ===================================================== */
 
     p, label, .stMarkdown, .stRadio label,
@@ -79,8 +79,6 @@ st.markdown(
         background-color: #1E1E1E !important;
         border-radius: 14px !important;
     }
-
-    /* ONLY dropdown selected values */
 
     .stSelectbox div[data-baseweb="select"] span {
         color: #FFFFFF !important;
@@ -169,7 +167,13 @@ metadata_lookup = {}
 
 for _, row in metadata_df.iterrows():
 
-    metadata_lookup[str(row["KEGG_ID"])] = {
+    normalized_metadata_kegg = (
+        str(row["KEGG_ID"])
+        .replace("ko:", "")
+        .strip()
+    )
+
+    metadata_lookup[normalized_metadata_kegg] = {
         "Names": row.get("Names", ""),
         "HSA Symbols": row.get("HSA_Symbols", ""),
         "HSA Biological Names": row.get(
@@ -250,7 +254,14 @@ for _, row in sheet1.iterrows():
         relation=row["RelationID"]
     )
 
-    source_meta = metadata_lookup.get(source_kegg, {})
+    normalized_source_kegg = (
+        source_kegg.replace("ko:", "").strip()
+    )
+
+    source_meta = metadata_lookup.get(
+        normalized_source_kegg,
+        {}
+    )
 
     node_metadata[source] = {
         "Node ID": source,
@@ -267,7 +278,14 @@ for _, row in sheet1.iterrows():
         "Degree": G.degree(source)
     }
 
-    target_meta = metadata_lookup.get(target_kegg, {})
+    normalized_target_kegg = (
+        target_kegg.replace("ko:", "").strip()
+    )
+
+    target_meta = metadata_lookup.get(
+        normalized_target_kegg,
+        {}
+    )
 
     node_metadata[target] = {
         "Node ID": target,
@@ -399,7 +417,14 @@ if show_cross_pathway:
 
         target_kegg = str(row.get("Target_KEGG_IDs", ""))
 
-        target_meta = metadata_lookup.get(target_kegg, {})
+        normalized_cross_kegg = (
+            target_kegg.replace("ko:", "").strip()
+        )
+
+        target_meta = metadata_lookup.get(
+            normalized_cross_kegg,
+            {}
+        )
 
         node_metadata[target] = {
             "Node ID": target,
