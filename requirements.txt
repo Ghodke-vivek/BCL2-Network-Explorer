@@ -5,3 +5,4 @@ networkx
 pyvis
 st-cytoscape
 streamlit-cytoscapejs
+streamlit-agraph
