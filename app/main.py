@@ -269,6 +269,12 @@ for _, row in sheet1.iterrows():
     }
 
 # =========================================================
+# PRESERVE MAIN CHAIN NODES
+# =========================================================
+
+main_chain_nodes = set(G.nodes())
+
+# =========================================================
 # CROSS PATHWAY
 # =========================================================
 
@@ -278,6 +284,17 @@ if show_cross_pathway:
 
         source = str(row["Chain_Node"])
         target = str(row["Connected_Node"])
+
+        # ONLY allow direct attachment
+        # from original main chain nodes
+
+        if source not in main_chain_nodes:
+            continue
+
+        # Prevent recursive chaining
+
+        if target in main_chain_nodes:
+            continue
 
         G.add_node(target)
 
