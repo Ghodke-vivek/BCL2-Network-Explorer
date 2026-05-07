@@ -3,6 +3,7 @@ import pandas as pd
 import networkx as nx
 from pathlib import Path
 import json
+import tempfile
 
 from streamlit_agraph import (
     agraph,
@@ -559,6 +560,78 @@ with center_col:
 
     if searched_node:
         selected_node = searched_node
+
+
+# =========================================================
+# NETWORK EXPORT
+# =========================================================
+
+import tempfile
+
+with center_col:
+
+    st.markdown("---")
+    st.subheader("Export Network")
+
+    # =====================================================
+    # EXPORT EDGE LIST CSV
+    # =====================================================
+
+    edge_export_df = pd.DataFrame([
+        {
+            "Source": u,
+            "Target": v,
+            "Relation": d.get("relation", "")
+        }
+        for u, v, d in G.edges(data=True)
+    ])
+
+    edge_csv = edge_export_df.to_csv(index=False)
+
+    st.download_button(
+        label="Download Edge List CSV",
+        data=edge_csv,
+        file_name="bcl2_network_edges.csv",
+        mime="text/csv"
+    )
+
+    # =====================================================
+    # EXPORT NODE METADATA CSV
+    # =====================================================
+
+    node_export_df = pd.DataFrame.from_dict(
+        node_metadata,
+        orient="index"
+    )
+
+    node_csv = node_export_df.to_csv(index=False)
+
+    st.download_button(
+        label="Download Node Metadata CSV",
+        data=node_csv,
+        file_name="bcl2_network_nodes.csv",
+        mime="text/csv"
+    )
+
+    # =====================================================
+    # EXPORT GRAPHML
+    # =====================================================
+
+    with tempfile.NamedTemporaryFile(
+        delete=False,
+        suffix=".graphml"
+    ) as tmpfile:
+
+        nx.write_graphml(G, tmpfile.name)
+
+        with open(tmpfile.name, "rb") as f:
+
+            st.download_button(
+                label="Download GraphML",
+                data=f,
+                file_name="bcl2_network.graphml",
+                mime="application/xml"
+            )
 
 # =========================================================
 # RIGHT PANEL
