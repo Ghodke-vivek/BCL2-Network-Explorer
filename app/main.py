@@ -98,8 +98,16 @@ st.markdown(
         color: #FFFFFF !important;
     }
 
+    ul[data-testid="stSelectboxVirtualDropdown"] li span {
+        color: #FFFFFF !important;
+    }
+
     ul[data-testid="stSelectboxVirtualDropdown"] li:hover {
         background-color: #2F2F2F !important;
+        color: #FFFFFF !important;
+    }
+
+    ul[data-testid="stSelectboxVirtualDropdown"] li:hover span {
         color: #FFFFFF !important;
     }
 
